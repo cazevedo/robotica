@@ -42,6 +42,27 @@ A browser-based client (e.g. a URL like `http://127.0.0.1:8211/streaming/webrtc-
 
 Persist an environment/robot so it auto-loads next time: in the Isaac Sim GUI (via the WebRTC client), **File > Save As** to `/isaac-sim/content/scene.usd` — that path is bind-mounted from `./content` (next to this Dockerfile, in the repo checkout) on the host (see `run.sh`), so it survives the container being removed (it runs with `--rm`; nothing saved outside a mounted path persists). The next `./run.sh` opens that exact file automatically instead of the default blank stage — see "Stage autoload" below. The filename must be exactly `scene.usd`; that's what `autoload_stage.py` looks for. To go back to a blank stage, remove/rename `./content/scene.usd`.
 
+## ROS 2 robot control
+
+`autoload_stage.py` calls `setup_ros2_control_graph()` (in `ros2_control_graph.py`) right after opening the saved stage, then starts timeline playback (`omni.timeline`'s `.play()`) — the control graph's nodes only execute on playback ticks, and physics (so drive commands actually move anything) only steps while playing, so this happens automatically on every container start rather than requiring someone to open the WebRTC client and press Play first.
+
+`setup_ros2_control_graph()` builds an OmniGraph (`/World/ROS2ControlGraph`) that wires:
+- **`isaacsim.ros2.bridge.ROS2SubscribeJointState`** (topic `joint_command`, `sensor_msgs/msg/JointState`) →
+- **`isaacsim.core.nodes.IsaacArticulationController`** (targets the Lite6's articulation root) →
+  the robot's joints, plus a **`isaacsim.ros2.bridge.ROS2PublishJointState`** publishing feedback on `joint_states`.
+
+It's a no-op (prints and returns) if `/World/lite6` isn't present in the opened stage, and it's idempotent (skips if `/World/ROS2ControlGraph` already exists) — it does not check for or reconcile a graph that was saved into `scene.usd` under a *different* path or name.
+
+Test from a debug shell (`source /opt/ros/jazzy/setup.bash` first):
+```bash
+ros2 topic pub --once /joint_command sensor_msgs/msg/JointState "{name: [joint1], position: [0.5]}"
+ros2 topic echo /joint_states --once
+```
+
+**Articulation root is not `/World/lite6`.** The Lite6 asset (`.../Robots/Ufactory/lite6/lite6.usd`, payload-referenced at `/World/lite6`) applies `UsdPhysics.ArticulationRootAPI` to `/World/lite6/root_joint` (the fixed joint welding the base to world), not to the `/World/lite6` Xform itself — confirmed by downloading and inspecting the asset's USD layers directly (`lite6.usd` + its `configuration/lite6_base.usd` sublayer) via `pxr` bindings borrowed from `/isaac-sim/extscache/omni.usd.libs-*`, since `/isaac-sim/python.sh` alone doesn't have `pxr` on its path. `isaacsim.core.nodes.IsaacArticulationController`'s `robotPath` goes through PhysX's tensor API, which matches the *exact* prim carrying the API, not an ancestor — pointing it at `/World/lite6` reproducibly fails with `Pattern '/World/lite6' did not match any articulations`. Both `ArticulationController.inputs:robotPath` and `PublishJointState.inputs:targetPrim` in `ros2_control_graph.py` therefore use `/World/lite6/root_joint`. Joint names are `joint1`..`joint6` (revolute, all currently driven around the Z axis of their own frame).
+
+**Velocity and effort commands don't produce real motion with the asset's default drive gains — this is expected, not a bug in the graph wiring.** Each joint's `UsdPhysics.DriveAPI` (angular) has both stiffness and damping baked in as imported (e.g. joint1: stiffness ≈44, damping ≈0.018), i.e. a PD *position* drive. `IsaacArticulationController` writes whatever command type it's given into that same drive without changing gains, so a velocity or effort target gets fought and largely cancelled by the existing position-holding stiffness — confirmed empirically: a `position` command on joint1 (0.5 rad) reliably reached target, but a sustained `velocity` command on joint2 (0.3 rad/s) and an `effort` command on joint3 (5.0) each produced no measurable motion over 2+ seconds. Position control is thus the only mode that actually works today; this is by explicit user choice, not an oversight (the alternative would require dynamically zeroing stiffness/damping per joint based on which command field is populated, which was considered and deliberately deferred — see git history if you need to revisit this).
+
 ## Host prerequisites (not handled by the Dockerfile)
 
 The NVIDIA Container Toolkit must be installed on the host for `--gpus all` to work. It requires `sudo`, so it's not scripted here:

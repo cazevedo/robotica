@@ -50,8 +50,10 @@ WORKDIR /isaac-sim
 
 # Runs after Isaac Sim finishes loading (see autoload_stage.py): opens
 # /isaac-sim/content/scene.usd if run.sh's content mount has one saved,
-# otherwise leaves the default blank stage untouched.
+# otherwise leaves the default blank stage untouched. Also builds the ROS 2
+# joint control OmniGraph (ros2_control_graph.py) once the stage is open.
 COPY autoload_stage.py /isaac-sim/autoload_stage.py
+COPY ros2_control_graph.py /isaac-sim/ros2_control_graph.py
 
 # Restore the base image's documented rootless runtime default.
 USER 1234:1234

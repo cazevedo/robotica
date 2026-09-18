@@ -23,7 +23,6 @@ setup(
             'joint_echo = lite6_control.joint_echo:main',
             'jog_demo = lite6_control.jog_demo:main',
             'move_joints_demo = lite6_control.move_joints_demo:main',
-            'trajectory_demo = lite6_control.trajectory_demo:main',
         ],
     },
 )

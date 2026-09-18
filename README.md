@@ -81,7 +81,7 @@ a minute, and several minutes the very first time while Gazebo downloads models.
 ```
 
 ```bash
-ros2 run lite6_control trajectory_demo
+ros2 run <your_package> <your_node>
 ```
 
 ## 2. On the real robot
@@ -106,7 +106,7 @@ lab real 192.168.1.xxx
 ```
 
 ```bash
-ros2 run lite6_control trajectory_demo
+ros2 run <your_package> <your_node>
 ```
 
 Set `ROBOT_IP` in `.env` and you can drop the address: `lab real`.
@@ -126,9 +126,13 @@ Only the hardware behind it changes — `gz_ros2_control` in simulation,
 or care which, and that is what makes "Gazebo first, then hardware" a real
 workflow rather than a slogan.
 
-Watch the tracking error your node prints. Against fake controllers it is ~1e-5 rad;
-in Gazebo it is far larger, because Gazebo simulates mass, gravity and friction
-and the arm sags and overshoots. That difference *is* Test 7.
+So write your node against that action and `/joint_states`, and it moves from
+simulation to hardware untouched.
+
+Have it report the error between where you commanded a joint and where it ended
+up. Against fake controllers that residual is ~1e-5 rad — there is no physics to
+get in the way. In Gazebo it is far larger, because Gazebo simulates mass, gravity
+and friction, so the arm sags and overshoots. That difference *is* Test 7.
 
 ## The other path: talking to the driver directly
 
@@ -161,10 +165,13 @@ ros2 topic echo /ufactory/robot_states --once
 
 | Node | Works with | |
 |---|---|---|
-| `trajectory_demo` | `lab sim`, `lab real` | **the one to copy.** Sends a joint trajectory through `ros2_control` |
 | `joint_echo` | anything | minimal subscriber: subscribe, spin, print |
 | `move_joints_demo` | `lab driver` | self-contained; the driver API, read and command |
 | `jog_demo` | `lab driver` | one joint at a time, via the reusable `Lite6Client` |
+
+All three use the driver API, so they need `lab driver`. **The node you run in the
+simulation pipeline is one you write yourself**, against the trajectory action
+above.
 
 Start your own package in `src/`:
 

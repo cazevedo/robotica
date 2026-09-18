@@ -20,7 +20,6 @@ before the real arm" is possible. **Write your lab code against it.**
 
 | | Works with | |
 |---|---|---|
-| `trajectory_demo.py` | `lab sim`, `lab real` | **copy this one.** Reads `/joint_states`, sends a trajectory, reports the tracking error |
 | `joint_echo.py` | anything | the minimal node — subscribe, spin, print. Commands nothing |
 | `move_joints_demo.py` | `lab driver` | self-contained driver-API example, nothing hidden in a helper |
 | `lite6_client.py` | `lab driver` | the reusable `Lite6Client` class to import |
@@ -28,31 +27,24 @@ before the real arm" is possible. **Write your lab code against it.**
 
 ## Running
 
-Terminal 1, either one:
+Every node here except `joint_echo` uses the driver API, so terminal 1 is:
 
 ```bash
-lab sim
+lab driver 192.168.1.xxx
 ```
 
-```bash
-lab real 192.168.1.xxx
-```
-
-Terminal 2, the same command against either:
-
-```bash
-ros2 run lite6_control trajectory_demo --dry-run
-```
-
-```bash
-ros2 run lite6_control trajectory_demo
-```
-
-For the driver-API nodes instead, terminal 1 is `lab driver 192.168.1.xxx`, and:
+Terminal 2:
 
 ```bash
 ros2 run lite6_control move_joints_demo --dry-run
 ```
+
+```bash
+ros2 run lite6_control move_joints_demo
+```
+
+`joint_echo` works against anything that publishes `/joint_states`, including
+`lab sim` and `lab real`.
 
 ## Building
 
@@ -67,13 +59,29 @@ entry point, a changed `package.xml`/`setup.py`, or a new package — and re-sou
 
 ## Writing your own
 
-Copy `trajectory_demo.py`. The shape is: read `/joint_states` to find where the arm
-is, build waypoints as offsets from there, send them to the action, check the
-result. Then add it to `entry_points` in `setup.py` and `lab build` once.
+**For the simulation pipeline, nothing here is a template** — every node except
+`joint_echo` speaks the driver API, which Gazebo does not provide. Write against
+`ros2_control` instead:
+
+```
+/lite6_traj_controller/follow_joint_trajectory   control_msgs/action/FollowJointTrajectory
+/joint_states                                    sensor_msgs/msg/JointState
+```
+
+Send a `FollowJointTrajectory` goal with `joint_names` `joint1`..`joint6` and
+`JointTrajectoryPoint`s whose `time_from_start` is measured from the start of the
+whole trajectory, not from the previous point. Check `error_code` on the result:
+0 is success, anything else means the arm stopped early.
+
+Map `/joint_states` by name, not by index — the ordering is not promised, and the
+message may carry joints you did not ask about.
 
 Make waypoints relative to the current pose rather than absolute — the node is then
 safe from any starting configuration and cannot swing the arm across the workspace
 because someone left it somewhere unexpected.
+
+Add your node to `entry_points` in `setup.py`, declare `control_msgs` and
+`trajectory_msgs` in `package.xml`, then `lab build` once.
 
 ## Four things that will cost you an afternoon
 

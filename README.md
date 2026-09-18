@@ -235,26 +235,35 @@ on|off`, and `lab gazebo reset` hands control back to `.env`.
 
 ## Where the windows appear
 
-`DISPLAY_MODE` in `.env`, default `auto`. On Linux there is no WSLg, so `auto`
-lands on a noVNC desktop served at <http://localhost:6080/> — open it in a
-browser and RViz and Gazebo appear inside it. `./lab.sh vnc` opens it for you.
-`none` is headless.
+`DISPLAY_MODE` in `.env`, default `auto`, which on Linux resolves to `x11`:
+**RViz and Gazebo open as ordinary windows on your desktop**, rendered by your
+own GPU. Nothing to install and nothing to configure — `./lab.sh` mounts the X
+socket from `/tmp/.X11-unix`, passes `DISPLAY` through, and copies your session's
+auth cookie to a file the container can read.
+
+The cookie matters and is the usual reason a container "cannot open display"
+even though the socket is right there. On stock Ubuntu your session cookie is
+not in `~/.Xauthority` at all — GDM keeps its own — so `./lab.sh` looks in
+`$XAUTHORITY`, `~/.Xauthority` and `/run/user/$(id -u)/gdm/Xauthority`, and
+rewrites the entry to match whatever hostname the container presents. Only if it
+finds nothing does it fall back to `xhost +local:`, and it says so when it does.
+
+Rendering is hardware by default (`LIBGL_ALWAYS_SOFTWARE=0`). `./lab.sh` passes
+`/dev/dri` through, and adds an NVIDIA reservation when it finds the container
+toolkit — so Gazebo runs at a sensible speed rather than the software-rasteriser
+crawl the handout warns about. `lab doctor` prints the GL renderer actually in
+use — your card's name rather than `llvmpipe`, which is the software one.
+
+If any of that is unavailable — a headless box, plain ssh, a driver stack that
+will not cooperate — set `DISPLAY_MODE=vnc` in `.env` and `./lab.sh restart`.
+That runs a virtual X server inside the container and serves a desktop at
+<http://localhost:6080/> (`./lab.sh vnc`), which always works. `auto` falls back
+to it on its own when it finds no X socket. `LIBGL_ALWAYS_SOFTWARE=1` forces
+Mesa if hardware GL misbehaves: correct, slow, and the handout's Test 6
+fallback.
 
 If `lab test 3` opens nothing, `lab doctor` says whether the container can reach
-an X server at all. Usual fix: `DISPLAY_MODE=vnc` explicitly, then
-`./lab.sh restart`.
-
-Rendering is `LIBGL_ALWAYS_SOFTWARE=1` — Mesa's software rasteriser. RViz is
-comfortable, Gazebo is slow but usable. That is the expected Path C experience;
-say so when you submit if it is unusable.
-
-> **Native windows and your GPU are not wired up yet on this branch.**
-> `DISPLAY_MODE=x11` exists, but `docker-compose.yml` still mounts the X11 socket
-> from Docker Desktop's WSLg path (`/run/desktop/mnt/host/wslg/.X11-unix`), which
-> does not exist on Linux, and the optional GPU block passes `/dev/dxg` +
-> `/usr/lib/wsl`, which are WSL2-only. On a Linux host those want to be
-> `/tmp/.X11-unix` and `/dev/dri` (plus the NVIDIA container toolkit). Until that
-> is changed, use the browser desktop above — it works.
+an X server at all.
 
 ---
 
@@ -313,12 +322,15 @@ Container logs are UTC; your clock is probably local. Timestamps will look offse
 ```
 Dockerfile              Steps 1-8 of the handout, commented per step
 docker-compose.yml      volumes, display, ports, the LAB_GAZEBO switch
+docker-compose.gpu.yml  /dev/dri passthrough; added by lab.sh when present
+docker-compose.nvidia.yml   NVIDIA reservation; added when the toolkit is there
 .env.example            settings template (ROS_DOMAIN_ID, Gazebo, display)
 lab.sh / lab.ps1        host driver: build / up / shell / gazebo / doctor
+                        (also: the X cookie, and which compose files to use)
 docker/lab              in-container helper: the seven tests and the launches
 docker/entrypoint.sh    sources ROS, sets up the display, prints the banner
 docker/ros_setup.sh     Step 7 of the handout, sourced by every shell
-docker/start-display    VNC / external X (WSLg on the windows branch)
+docker/start-display    host X / VNC (WSLg on the windows branch)
 .devcontainer/          VS Code "Reopen in Container"
 src/lite6_control/      worked example ROS 2 Python package
 src/                    YOUR packages     (= ~/dev_ws/src)

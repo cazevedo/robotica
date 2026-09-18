@@ -16,13 +16,82 @@ command -v docker >/dev/null 2>&1 || die "docker is not installed or not on PATH
 docker compose version >/dev/null 2>&1 || die "'docker compose' is not available"
 [ -f .env ] || { cp .env.example .env; say ".env created from .env.example - set ROS_DOMAIN_ID in it"; }
 
-dc() { echo "${B}\$${R} docker compose $*"; docker compose "$@"; }
+###############################################################################
+# Display and GPU, the Linux way.
+#
+# RViz and Gazebo open as ordinary windows on your desktop: the container talks
+# to the X server you are already running, through the socket in /tmp/.X11-unix
+# and a copy of your auth cookie. No VNC, no WSLg, and the GPU you actually
+# have does the rendering.
+###############################################################################
+
+# Where the cookie lives on the host, and where the container will look for it.
+LAB_XAUTH_HOST="${LAB_XAUTH_HOST:-/tmp/.lab-robotica.xauth}"
+LAB_XAUTH_CONTAINER=/tmp/.lab.xauth
+export LAB_XAUTH_HOST LAB_XAUTH_CONTAINER
+
+setup_xauth() {
+    [ -z "${DISPLAY:-}" ] && return 0
+    command -v xauth >/dev/null 2>&1 || {
+        say "xauth is not installed (apt install xauth) - falling back to VNC"
+        return 1
+    }
+    # Truncated, not recreated: a running container has this bind-mounted, and
+    # a new inode would never reach it.
+    : > "${LAB_XAUTH_HOST}" 2>/dev/null || return 1
+
+    # On a GNOME/GDM desktop - i.e. stock Ubuntu - the cookie for your session
+    # is not in ~/.Xauthority at all, it is in GDM's own file. Look in all the
+    # usual places. The sed rewrites each entry's address family to FamilyWild
+    # (ffff) so it matches whatever hostname the container presents.
+    local src
+    for src in "${XAUTHORITY:-}" "${HOME}/.Xauthority" "/run/user/$(id -u)/gdm/Xauthority"; do
+        { [ -n "${src}" ] && [ -r "${src}" ]; } || continue
+        XAUTHORITY="${src}" xauth nlist "${DISPLAY}" 2>/dev/null \
+            | sed -e 's/^..../ffff/' | xauth -f "${LAB_XAUTH_HOST}" nmerge - 2>/dev/null || true
+        [ -s "${LAB_XAUTH_HOST}" ] && break
+    done
+
+    if [ ! -s "${LAB_XAUTH_HOST}" ]; then
+        say "no X cookie found for ${DISPLAY}; trying 'xhost +local:'"
+        say "  (that lets any local user reach your X server; undo: xhost -local:)"
+        command -v xhost >/dev/null 2>&1 && xhost +local: >/dev/null 2>&1 || true
+        # Give the mount something to point at even so.
+        : > "${LAB_XAUTH_HOST}"
+    fi
+    chmod 600 "${LAB_XAUTH_HOST}" 2>/dev/null || true
+    return 0
+}
+
+# Extra compose files, chosen from what this machine actually has. Kept out of
+# docker-compose.yml because compose fails outright on a device node that does
+# not exist.
+compose_files() {
+    local files=(-f docker-compose.yml)
+    if [ -d /dev/dri ]; then
+        files+=(-f docker-compose.gpu.yml)
+        # The nvidia stanza needs the container toolkit; without it compose
+        # dies with "could not select device driver nvidia".
+        if command -v nvidia-smi >/dev/null 2>&1 && docker info 2>/dev/null | grep -qi nvidia; then
+            files+=(-f docker-compose.nvidia.yml)
+        fi
+    fi
+    printf '%s\n' "${files[@]}"
+}
+
+COMPOSE_FILES=()
+while IFS= read -r line; do COMPOSE_FILES+=("${line}"); done < <(compose_files)
+
+dc() {
+    echo "${B}\$${R} docker compose $*"
+    docker compose "${COMPOSE_FILES[@]}" "$@"
+}
 
 running() {
-    local id; id="$(docker compose ps -q "${SERVICE}" 2>/dev/null)"
+    local id; id="$(docker compose "${COMPOSE_FILES[@]}" ps -q "${SERVICE}" 2>/dev/null)"
     [ -n "${id}" ] && [ "$(docker inspect -f '{{.State.Running}}' "${id}" 2>/dev/null)" = "true" ]
 }
-ensure_up() { running || { say "starting container"; dc up -d >/dev/null; sleep 1; }; }
+ensure_up() { setup_xauth; running || { say "starting container"; dc up -d >/dev/null; sleep 1; }; }
 
 set_env() {  # set_env KEY VALUE
     if grep -qE "^\s*$1\s*=" .env; then

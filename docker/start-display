@@ -2,13 +2,15 @@
 ###############################################################################
 # Give the container something to draw on.
 #
-#   DISPLAY_MODE=auto   use WSLg if it is there, otherwise fall back to vnc
-#   DISPLAY_MODE=wslg   Windows 11 + Docker Desktop: RViz/Gazebo open as
-#                       ordinary Windows windows. Fastest, nicest.
+#   DISPLAY_MODE=auto   use the host's X server if its socket is mounted,
+#                       otherwise fall back to vnc. The right answer on Linux.
+#   DISPLAY_MODE=x11    the X server already running on your Linux desktop.
+#                       RViz and Gazebo open as ordinary windows, rendered by
+#                       your own GPU. lab.sh mounts /tmp/.X11-unix and passes
+#                       DISPLAY plus an auth cookie. Fastest, nicest.
 #   DISPLAY_MODE=vnc    run a virtual X server inside the container and serve
 #                       it at http://localhost:6080/ . Always works.
-#   DISPLAY_MODE=x11    an X server you run yourself (VcXsrv, X410, XQuartz).
-#                       Set DISPLAY yourself, e.g. host.docker.internal:0.0
+#   DISPLAY_MODE=wslg   Windows 11 + Docker Desktop (the windows branch).
 #   DISPLAY_MODE=none   headless. No GUI at all.
 #
 # Writes the resolved DISPLAY to /tmp/.lab-display and the mode actually used
@@ -22,9 +24,23 @@ VNC_DISPLAY="${VNC_DISPLAY:-:99}"
 
 log() { echo "[display] $*"; }
 
+# Is there a usable X socket for the DISPLAY we were handed? Checking for X0
+# specifically is wrong on Linux: a normal GNOME session is often :1, and X0
+# may not exist at all.
+have_x11() {
+    local d="${DISPLAY:-}"
+    [ -n "${d}" ] || return 1
+    case "${d}" in
+        *:*) ;;                      # :1, :0.0, host:0 - fine
+        *)   return 1 ;;
+    esac
+    local n="${d#*:}"; n="${n%%.*}"  # ":1.0" -> "1"
+    [ -S "/tmp/.X11-unix/X${n}" ]
+}
+
 have_wslg() {
     # Docker Desktop bind-mounts the host's WSLg socket dir onto /tmp/.X11-unix.
-    [ -S /tmp/.X11-unix/X0 ]
+    [ -S /tmp/.X11-unix/X0 ] && [ -d /mnt/wslg ]
 }
 
 start_vnc() {
@@ -65,8 +81,12 @@ case "${MODE}" in
     auto)
         if have_wslg; then
             MODE=wslg
+        elif have_x11; then
+            MODE=x11
         else
-            log "no WSLg socket at /tmp/.X11-unix/X0 - falling back to VNC"
+            log "no X socket for DISPLAY='${DISPLAY:-unset}' - falling back to VNC"
+            log "  (on Linux, start the container with ./lab.sh so it passes"
+            log "   DISPLAY through and mounts /tmp/.X11-unix)"
             MODE=vnc
         fi
         ;;
@@ -89,8 +109,17 @@ case "${MODE}" in
         start_vnc || exit 1
         ;;
     x11)
-        export DISPLAY="${DISPLAY:-host.docker.internal:0.0}"
-        log "using external X server on ${DISPLAY}"
+        # No default guess here: on Linux the host's DISPLAY is passed in, and
+        # inventing host.docker.internal:0.0 would only mask a missing one.
+        if [ -z "${DISPLAY:-}" ]; then
+            log "WARNING: DISPLAY_MODE=x11 but DISPLAY is empty. Start the"
+            log "         container with ./lab.sh, or set DISPLAY_MODE=vnc."
+        elif have_x11; then
+            log "using the host X server on ${DISPLAY} - windows open on your desktop"
+        else
+            log "WARNING: DISPLAY=${DISPLAY} but /tmp/.X11-unix has no matching"
+            log "         socket. Is the host's X socket mounted? ./lab.sh does it."
+        fi
         ;;
     none)
         unset DISPLAY

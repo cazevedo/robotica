@@ -18,3 +18,9 @@ __pycache__/
 *.pyc
 .vscode/
 *.swp
+
+# Generated at Isaac Sim startup by extract_chain.py; regenerated every run.
+isaac-sim/content/lite6_chain.json
+isaac-sim/ros2_ws/build/
+isaac-sim/ros2_ws/install/
+isaac-sim/ros2_ws/log/

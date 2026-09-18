@@ -22,7 +22,24 @@ class JointEcho(Node):
         super().__init__('joint_echo')
 
         # Parameters are how you configure a node without editing it.
-        self.declare_parameter('namespace', 'ufactory')
+        #
+        # namespace: which joint_states to listen to.
+        #
+        #   ''          -> /joint_states            (the default)
+        #   'ufactory'  -> /ufactory/joint_states
+        #
+        # Gazebo's joint_state_broadcaster publishes /joint_states and nothing
+        # else - verified: there is no /ufactory/joint_states in simulation.
+        # The real driver is the other way round: it publishes
+        # /ufactory/joint_states, and only the full lite6_moveit_realmove
+        # launch adds a joint_state_publisher that republishes it to
+        # /joint_states as well.
+        #
+        # So /joint_states is the one topic both worlds share, which is why it
+        # is the default. Point this at 'ufactory' when you are talking to the
+        # driver on its own, or want the arm's raw feedback rather than the
+        # aggregated version.
+        self.declare_parameter('namespace', '')
         self.declare_parameter('rate_hz', 2.0)
         self.declare_parameter('degrees', False)
 
@@ -30,14 +47,18 @@ class JointEcho(Node):
         self._degrees = self.get_parameter('degrees').value
         period = 1.0 / max(self.get_parameter('rate_hz').value, 0.1)
 
+        # Built in two steps: an empty namespace has to give '/joint_states',
+        # not '//joint_states', which is not a legal topic name and would fail
+        # at construction.
+        topic = f'/{namespace}/joint_states' if namespace else '/joint_states'
+
         self._latest = None
-        self.create_subscription(
-            JointState, f'/{namespace}/joint_states', self._on_joint_state, 10)
+        self.create_subscription(JointState, topic, self._on_joint_state, 10)
 
         # Print on a timer rather than on every message: the driver publishes
         # far faster than you can read.
         self.create_timer(period, self._print)
-        self.get_logger().info(f'listening on /{namespace}/joint_states')
+        self.get_logger().info(f'listening on {topic}')
 
     def _on_joint_state(self, msg: JointState) -> None:
         self._latest = msg

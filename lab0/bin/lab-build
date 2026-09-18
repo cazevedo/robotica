@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# colcon build your own workspace (~/dev_ws), then re-source it.
+#
+# Uses --symlink-install so that editing a Python node or a launch file takes
+# effect without rebuilding. Arguments are passed through to colcon.
+# Sourced before `set -u`: ROS 2 setup.bash reads unset variables of its own.
+source /etc/lab-env.sh
+set -euo pipefail
+cd "$HOME/dev_ws"
+
+if [ -z "$(find src -mindepth 1 -maxdepth 2 -name package.xml -print -quit 2>/dev/null)" ]; then
+    echo "~/dev_ws/src has no packages yet — nothing to build."
+    echo "Create one with:  cd ~/dev_ws/src && ros2 pkg create --build-type ament_python my_pkg"
+    exit 0
+fi
+
+rosdep install --from-paths src --ignore-src --rosdistro jazzy -y || true
+colcon build --symlink-install --parallel-workers "${COLCON_JOBS:-2}" "$@"
+
+echo
+echo "Built. In this shell:  source ~/dev_ws/install/setup.bash"
+echo "New shells pick it up on their own."

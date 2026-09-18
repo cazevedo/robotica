@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Environment self-test. Covers what can be checked without a human looking at
+# a window: Tests 1, 2 and 6 of the handout, plus the display plumbing.
+#
+# Tests 3, 4, 5 and 7 need you to look at RViz and Gazebo — this cannot do them
+# for you. It tells you which ones to run by hand.
+source /etc/lab-env.sh
+
+pass=0; fail=0
+ok()   { printf '  \033[32mPASS\033[0m  %s\n' "$1"; pass=$((pass+1)); }
+no()   { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; fail=$((fail+1)); }
+info() { printf '        %s\n' "$1"; }
+
+echo
+echo "Robotics lab — environment check"
+echo "================================"
+
+echo
+echo "ROS 2 core"
+if command -v ros2 >/dev/null; then ok "ros2 on PATH"; else no "ros2 not found — ROS is not sourced"; fi
+info "ROS_DISTRO=$ROS_DISTRO  ROS_DOMAIN_ID=$ROS_DOMAIN_ID"
+[ "$ROS_DOMAIN_ID" = "0" ] && info "domain id is still the default 0 — set your assigned number (./run.sh --domain-id N)"
+
+echo
+echo "Core packages"
+core_missing=""
+for p in demo_nodes_cpp demo_nodes_py tf2_ros tf2_tools rviz2 moveit_ros_move_group; do
+    ros2 pkg list 2>/dev/null | grep -qx "$p" || core_missing="$core_missing $p"
+done
+if [ -z "$core_missing" ]; then ok "ros2 desktop + moveit complete"; else no "missing:$core_missing"; fi
+for b in rviz2 ros2; do command -v "$b" >/dev/null || no "$b executable not on PATH"; done
+
+echo
+echo "Test 1 — talker/listener"
+if timeout 25 bash -c '
+    source /etc/lab-env.sh
+    ros2 run demo_nodes_cpp talker >/tmp/lab_talker.log 2>&1 &
+    tpid=$!
+    ros2 run demo_nodes_py listener >/tmp/lab_listener.log 2>&1 &
+    lpid=$!
+    for _ in $(seq 1 20); do
+        sleep 1
+        grep -q "I heard" /tmp/lab_listener.log && break
+    done
+    kill $tpid $lpid 2>/dev/null
+    wait 2>/dev/null
+    grep -q "I heard" /tmp/lab_listener.log
+'; then ok "listener heard the talker"; else no "listener heard nothing (see /tmp/lab_listener.log)"; fi
+
+echo
+echo "Test 2 — UFACTORY packages"
+missing=""
+for p in uf_ros_lib xarm_api xarm_controller xarm_description xarm_gazebo xarm_moveit_config xarm_msgs xarm_planner; do
+    ros2 pkg list 2>/dev/null | grep -qx "$p" || missing="$missing $p"
+done
+if [ -z "$missing" ]; then ok "all eight packages visible"; else no "missing:$missing"; fi
+
+echo
+echo "Test 6 — Gazebo"
+if [ "${ENABLE_GAZEBO:-1}" = "0" ]; then
+    info "skipped — gazebo disabled in this shell (--no-gazebo)"
+elif command -v gz >/dev/null; then
+    v="$(gz sim --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+    case "$v" in 8.*) ok "gz sim $v (Gazebo Sim 8 = Harmonic)";; "") no "gz sim gave no version";; *) no "gz sim reports $v — expected 8.x (Harmonic)";; esac
+else no "gz not found"; fi
+
+echo
+echo "Display"
+if [ -z "${DISPLAY:-}" ]; then
+    no "DISPLAY unset — RViz and Gazebo cannot open a window"
+elif timeout 10 xdpyinfo >/dev/null 2>&1; then
+    ok "X server reachable on $DISPLAY"
+else
+    no "DISPLAY=$DISPLAY but the X server did not answer (try ./run.sh --restart, or xhost +local: on the host)"
+fi
+command -v glxinfo >/dev/null && info "GL renderer: $(timeout 10 glxinfo -B 2>/dev/null | grep -i 'OpenGL renderer' | cut -d: -f2- | xargs)"
+[ "${LIBGL_ALWAYS_SOFTWARE:-0}" = "1" ] && info "software rendering forced (--software-gl)"
+
+echo
+echo "Graphviz (Test 4 needs it to draw the frames PDF)"
+command -v dot >/dev/null && ok "dot $(dot -V 2>&1 | awk '{print $5}')" || no "graphviz missing"
+
+echo
+echo "--------------------------------"
+printf '  %d passed, %d failed\n' "$pass" "$fail"
+cat <<'MSG'
+
+  Still to run by hand (they need you to look at a window):
+    Test 3  lab-start fake              RViz shows the arm + MotionPlanning
+    Test 4  ros2 run tf2_tools view_frames      (run it from ~/dev_ws so the
+                                                 PDF lands on your host)
+    Test 5  ros2 run tf2_ros tf2_echo link_base link_eef
+    Test 7  lab-start gazebo            arm must move in Gazebo, not just RViz
+MSG
+[ "$fail" -eq 0 ]

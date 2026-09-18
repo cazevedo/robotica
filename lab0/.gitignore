@@ -1,0 +1,12 @@
+# Your workspace: source is yours to commit if you want it, build output is not.
+dev_ws/build/
+dev_ws/install/
+dev_ws/log/
+dev_ws/frames_*.pdf
+dev_ws/frames_*.gv
+
+# Per-container home: gazebo model cache, rviz layout, shell history, ros logs.
+.home/
+
+# Your domain id / robot ip.
+.env

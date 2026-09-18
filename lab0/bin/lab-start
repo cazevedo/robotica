@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Launch the Lite 6 against one of five back ends.
+#
+# With MoveIt (what Lab 0's tests use — MoveIt is the reference you check your
+# own kinematics against, not a tool you are meant to build on):
+#   lab-start gazebo          Gazebo Harmonic + RViz + ros2_control  (Test 7)
+#   lab-start fake            RViz + MoveIt, fake controllers, no physics (Test 3)
+#   lab-start real            the physical arm — needs ROBOT_IP
+#
+# Without MoveIt — no move_group, no MotionPlanning panel, so your own DH / FK /
+# IK / velocity / planning code is the only thing driving the arm:
+#   lab-start bare            Gazebo + ros2_control. Command the arm yourself on
+#                             /lite6_traj_controller/follow_joint_trajectory.
+#   lab-start model           URDF + robot_state_publisher + RViz only. No
+#                             physics: move the joint sliders and compare TF
+#                             against your own forward kinematics.
+#
+#   lab-start                 the default for this shell (see ENABLE_GAZEBO)
+#
+# Anything after the back end is passed through to ros2 launch.
+# Sourced before `set -u`: ROS 2 setup.bash reads unset variables of its own.
+source /etc/lab-env.sh
+set -euo pipefail
+
+backend="${1:-}"
+[ $# -gt 0 ] && shift
+
+if [ -z "$backend" ]; then
+    if [ "${ENABLE_GAZEBO:-1}" = "0" ]; then backend=fake; else backend=gazebo; fi
+fi
+
+case "$backend" in
+    gazebo)
+        if [ "${ENABLE_GAZEBO:-1}" = "0" ]; then
+            cat >&2 <<'MSG'
+lab-start: gazebo is disabled in this shell (ENABLE_GAZEBO=0).
+
+That is the whole point of the flag — nothing heavy gets launched by accident
+while you are working against the real arm. To run it anyway:
+
+  export ENABLE_GAZEBO=1 && lab-start gazebo     # just this shell
+  ./run.sh --gazebo                              # on the host, for new shells
+MSG
+            exit 1
+        fi
+        echo "--> Gazebo Harmonic + RViz + ros2_control (this takes up to a minute)"
+        exec ros2 launch xarm_moveit_config lite6_moveit_gazebo.launch.py "$@"
+        ;;
+    fake)
+        echo "--> RViz + MoveIt with fake controllers (no physics, no Gazebo)"
+        exec ros2 launch xarm_moveit_config lite6_moveit_fake.launch.py "$@"
+        ;;
+    bare)
+        if [ "${ENABLE_GAZEBO:-1}" = "0" ]; then
+            echo "lab-start: 'bare' runs Gazebo, which is disabled in this shell." >&2
+            echo "           Use 'lab-start model' for RViz only, or ./run.sh --gazebo." >&2
+            exit 1
+        fi
+        echo "--> Gazebo + ros2_control + RViz (RobotModel and TF), no MoveIt."
+        echo "    Nothing plans for you: command the arm on"
+        echo "    /lite6_traj_controller/follow_joint_trajectory, read it back on"
+        echo "    /joint_states and /tf. RViz Fixed Frame is world."
+        exec ros2 launch /opt/lab/lite6_bare.launch.py "$@"
+        ;;
+    model)
+        echo "--> URDF + robot_state_publisher + RViz, no physics and no MoveIt."
+        echo "    Drive the joint sliders; compare /tf against your own kinematics."
+        exec ros2 launch xarm_description lite6_rviz_display.launch.py "$@"
+        ;;
+    real)
+        ip="${ROBOT_IP:-}"
+        for a in "$@"; do case "$a" in robot_ip:=*) ip="${a#robot_ip:=}";; esac; done
+        if [ -z "$ip" ]; then
+            cat >&2 <<'MSG'
+lab-start real: no robot IP.
+
+  ./run.sh --robot-ip 192.168.1.xxx        (on the host)
+  ROBOT_IP=192.168.1.xxx lab-start real    (just this once)
+
+The address is on the label on the base of the arm. Check `ping <ip>` first,
+and that the arm is enabled (UFACTORY Studio, http://<ip>:18333).
+MSG
+            exit 1
+        fi
+        echo "--> Real Lite 6 at ${ip}. Services live under /ufactory/... , not /xarm/..."
+        echo "    Emergency stop within reach. Nobody inside the workspace of the arm."
+        exec ros2 launch xarm_moveit_config lite6_moveit_realmove.launch.py "robot_ip:=${ip}" "$@"
+        ;;
+    -h|--help|help)
+        sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+        exit 0
+        ;;
+    *)
+        echo "lab-start: unknown back end '$backend'" >&2
+        echo "           expected one of: gazebo, fake, real, bare, model" >&2
+        exit 2
+        ;;
+esac

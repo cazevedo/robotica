@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Container entrypoint: wire up the persistent directories, then hand over.
+set -euo pipefail
+
+PERSIST="$HOME/.persist"
+
+# run.sh bind-mounts lab0/.home here. Caches that are expensive to rebuild
+# (Gazebo's downloaded models above all — the "hangs for minutes on first
+# launch" in the handout happens once per cache, not once per container) get
+# symlinked into it so they outlive the container.
+if [ -d "$PERSIST" ]; then
+    # ~/.ros is deliberately not in this list: the image already has one,
+    # holding the rosdep cache built at image build time, and it is worth more
+    # than the node logs that would go alongside it.
+    for d in .gz .gazebo .ignition .rviz2 .config; do
+        mkdir -p "$PERSIST/$d"
+        if [ ! -e "$HOME/$d" ]; then
+            ln -s "$PERSIST/$d" "$HOME/$d"
+        fi
+    done
+fi
+
+# The workspace is bind-mounted from the host and may arrive empty.
+mkdir -p "$HOME/dev_ws/src"
+
+exec "$@"

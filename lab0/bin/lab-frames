@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# view_frames, but it tells you when there is nothing to draw.
+#
+# Run bare, view_frames always succeeds: with no TF data it writes a PDF
+# containing an empty graph, which looks like a broken install rather than
+# what it is — nothing was publishing.
+# Sourced before `set -u`: ROS 2 setup.bash reads unset variables of its own.
+source /etc/lab-env.sh
+set -uo pipefail
+
+pubs="$(ros2 topic info /tf 2>/dev/null | awk '/Publisher count/{print $NF}')"
+if [ "${pubs:-0}" -eq 0 ] 2>/dev/null; then
+    cat >&2 <<MSG
+lab-frames: nothing is publishing /tf on ROS_DOMAIN_ID=${ROS_DOMAIN_ID}.
+
+view_frames would hand you a PDF with no frames in it, so stopping here instead.
+
+  - Is the robot running in another terminal?  lab-start fake | bare | gazebo
+  - Is that terminal on the same domain id? Run  echo \$ROS_DOMAIN_ID  in both.
+    A shell you opened *before* editing lab0/.env still carries the old value,
+    and two domain ids means two ROS graphs that cannot see each other.
+MSG
+    exit 1
+fi
+
+# ~/dev_ws is the bind mount, so the PDF lands on the host where you can open it.
+cd "$HOME/dev_ws" || exit 1
+ros2 run tf2_tools view_frames "$@" || exit $?
+
+newest="$(ls -t frames_*.pdf 2>/dev/null | head -1)"
+if [ -n "$newest" ]; then
+    echo
+    echo "Wrote $newest — on the host that is lab0/dev_ws/$newest"
+    echo "Frames found: $(grep -c '^"' "${newest%.pdf}.gv" 2>/dev/null || echo '?') edges"
+fi

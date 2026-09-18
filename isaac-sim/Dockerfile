@@ -51,9 +51,14 @@ WORKDIR /isaac-sim
 # Runs after Isaac Sim finishes loading (see autoload_stage.py): opens
 # /isaac-sim/content/scene.usd if run.sh's content mount has one saved,
 # otherwise leaves the default blank stage untouched. Also builds the ROS 2
-# joint control OmniGraph (ros2_control_graph.py) once the stage is open.
+# joint control OmniGraph (ros2_control_graph.py) once the stage is open,
+# and caches the robot's extracted kinematic chain (extract_chain.py) --
+# both of these are thin, stable shims; the substantial code they call
+# into (dh_lab, under ros2_ws/) is bind-mounted (see run.sh), not baked in
+# here, so it can be edited without rebuilding this image.
 COPY autoload_stage.py /isaac-sim/autoload_stage.py
 COPY ros2_control_graph.py /isaac-sim/ros2_control_graph.py
+COPY extract_chain.py /isaac-sim/extract_chain.py
 
 # Restore the base image's documented rootless runtime default.
 USER 1234:1234

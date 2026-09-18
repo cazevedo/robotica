@@ -1,8 +1,0 @@
-# The build context only needs the Dockerfile plus bin/ and etc/. Everything
-# below is either your data or generated, and would be copied into the daemon
-# on every build for nothing.
-dev_ws/
-.home/
-.env
-.devcontainer/
-README.md

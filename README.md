@@ -90,7 +90,7 @@ a minute, and several minutes the very first time while Gazebo downloads models.
 ```
 
 ```bash
-ros2 run lite6_control trajectory_demo
+ros2 run lite6_control joint_echo
 ```
 
 ## 2. On the real robot
@@ -115,7 +115,7 @@ lab real 192.168.1.xxx
 ```
 
 ```bash
-ros2 run lite6_control trajectory_demo
+ros2 run lite6_control joint_echo
 ```
 
 Set `ROBOT_IP` in `.env` and you can drop the address: `lab real`.
@@ -170,7 +170,6 @@ ros2 topic echo /ufactory/robot_states --once
 
 | Node | Works with | |
 |---|---|---|
-| `trajectory_demo` | `lab sim`, `lab real` | **the one to copy.** Sends a joint trajectory through `ros2_control` |
 | `joint_echo` | anything | minimal subscriber: subscribe, spin, print |
 | `move_joints_demo` | `lab driver` | self-contained; the driver API, read and command |
 | `jog_demo` | `lab driver` | one joint at a time, via the reusable `Lite6Client` |

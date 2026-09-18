@@ -20,8 +20,7 @@ before the real arm" is possible. **Write your lab code against it.**
 
 | | Works with | |
 |---|---|---|
-| `trajectory_demo.py` | `lab sim`, `lab real` | **copy this one.** Reads `/joint_states`, sends a trajectory, reports the tracking error |
-| `joint_echo.py` | anything | the minimal node — subscribe, spin, print. Commands nothing |
+| `joint_echo.py` | `lab sim`, `lab real`, `lab driver` | the minimal node — subscribe, spin, print. The only one here that runs unchanged against both simulation and hardware, because it only reads |
 | `move_joints_demo.py` | `lab driver` | self-contained driver-API example, nothing hidden in a helper |
 | `lite6_client.py` | `lab driver` | the reusable `Lite6Client` class to import |
 | `jog_demo.py` | `lab driver` | one joint at a time, built on `Lite6Client` |
@@ -41,11 +40,7 @@ lab real 192.168.1.xxx
 Terminal 2, the same command against either:
 
 ```bash
-ros2 run lite6_control trajectory_demo --dry-run
-```
-
-```bash
-ros2 run lite6_control trajectory_demo
+ros2 run lite6_control joint_echo
 ```
 
 For the driver-API nodes instead, terminal 1 is `lab driver 192.168.1.xxx`, and:
@@ -67,9 +62,16 @@ entry point, a changed `package.xml`/`setup.py`, or a new package — and re-sou
 
 ## Writing your own
 
-Copy `trajectory_demo.py`. The shape is: read `/joint_states` to find where the arm
-is, build waypoints as offsets from there, send them to the action, check the
+Start from `joint_echo.py` for the plumbing — node, subscription, spin — and from
+`move_joints_demo.py` for commanding. The shape is: read `/joint_states` to find
+where the arm is, build waypoints as offsets from there, send them, check the
 result. Then add it to `entry_points` in `setup.py` and `lab build` once.
+
+Nothing here currently commands both simulation and hardware from one command:
+the demos that move the arm go through the driver's `/ufactory` services, which
+Gazebo does not provide. A node that sends a `FollowJointTrajectory` goal to
+`ros2_control` would work against both — that is the portable shape, and it is
+the one worth writing.
 
 Make waypoints relative to the current pose rather than absolute — the node is then
 safe from any starting configuration and cannot swing the arm across the workspace

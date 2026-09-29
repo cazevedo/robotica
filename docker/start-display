@@ -52,14 +52,16 @@ start_vnc() {
         return 1
     fi
 
+    # The fluxbox theme wants a wallpaper image, and no wallpaper setter is
+    # installed, so fluxbox pops up an xmessage nagging about it on every
+    # start. A do-nothing fbsetbg ahead of the real one on PATH silences it.
+    mkdir -p "${HOME}/.fluxbox/bin"
+    printf '#!/bin/sh\nexit 0\n' > "${HOME}/.fluxbox/bin/fbsetbg"
+    chmod +x "${HOME}/.fluxbox/bin/fbsetbg"
     # Open every window maximised: in a browser tab a small RViz/Gazebo
     # window on a big empty desktop is hard to hit and easy to drag away.
-    mkdir -p "${HOME}/.fluxbox"
-    # No wallpaper setter is installed; without this fluxbox pops up an
-    # xmessage nagging about it on every start.
-    [ -f "${HOME}/.fluxbox/overlay" ] || echo 'background: none' > "${HOME}/.fluxbox/overlay"
     [ -f "${HOME}/.fluxbox/apps" ] || printf '[app] (name=.*)\n  [Maximized]\t{yes}\n[end]\n' > "${HOME}/.fluxbox/apps"
-    fluxbox -display "${VNC_DISPLAY}" >>"${L}" 2>&1 &
+    PATH="${HOME}/.fluxbox/bin:${PATH}" fluxbox -display "${VNC_DISPLAY}" >>"${L}" 2>&1 &
     x11vnc -display "${VNC_DISPLAY}" -forever -shared -nopw -rfbport 5900 \
            -noxdamage -quiet >>"${L}" 2>&1 &
     websockify --web=/usr/share/novnc 6080 localhost:5900 >>"${L}" 2>&1 &

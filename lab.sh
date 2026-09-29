@@ -28,7 +28,15 @@ running() {
     local id; id="$(docker compose ps -q "${SERVICE}" 2>/dev/null)"
     [ -n "${id}" ] && [ "$(docker inspect -f '{{.State.Running}}' "${id}" 2>/dev/null)" = "true" ]
 }
-ensure_up() { running || { say "starting container"; dc up -d >/dev/null; sleep 1; }; }
+# The entrypoint needs a few seconds to bring up the display; commands that
+# arrive before it has written /tmp/.lab-display-mode see no DISPLAY at all.
+wait_ready() {
+    for _ in $(seq 1 40); do
+        docker compose exec -T "${SERVICE}" test -f /tmp/.lab-display-mode 2>/dev/null && return 0
+        sleep 0.5
+    done
+}
+ensure_up() { running || { say "starting container"; dc up -d >/dev/null; }; wait_ready; }
 
 set_env() {  # set_env KEY VALUE
     # [[:space:]] rather than \s: macOS (BSD) sed does not know \s.
@@ -45,10 +53,10 @@ case "${1:-help}" in
         shift; dc --progress plain build "$@" ;;
     rebuild)        shift; dc --progress plain build "$@" ;;
     rebuild-xarm)   dc --progress plain build --build-arg "XARM_CACHEBUST=$(date +%Y-%m-%d-%H%M%S)" ;;
-    up|start)       dc up -d && say "running. Open a terminal:  ./lab.sh shell" \
+    up|start)       dc up -d && wait_ready && say "running. Open a terminal:  ./lab.sh shell" \
                         && say "GUI (RViz/Gazebo):  ./lab.sh vnc   ->  http://localhost:6080/" ;;
     down|stop)      dc down ;;
-    restart)        dc down; dc up -d ;;
+    restart)        dc down; dc up -d && wait_ready ;;
     shell|sh|bash)  ensure_up; docker compose exec "${SERVICE}" bash ;;
     run|exec)       shift; ensure_up; docker compose exec "${SERVICE}" "$@" ;;
     doctor|check)   ensure_up; docker compose exec "${SERVICE}" lab doctor ;;

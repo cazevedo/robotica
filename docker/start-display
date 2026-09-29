@@ -55,6 +55,9 @@ start_vnc() {
     # Open every window maximised: in a browser tab a small RViz/Gazebo
     # window on a big empty desktop is hard to hit and easy to drag away.
     mkdir -p "${HOME}/.fluxbox"
+    # No wallpaper setter is installed; without this fluxbox pops up an
+    # xmessage nagging about it on every start.
+    [ -f "${HOME}/.fluxbox/overlay" ] || echo 'background: none' > "${HOME}/.fluxbox/overlay"
     [ -f "${HOME}/.fluxbox/apps" ] || printf '[app] (name=.*)\n  [Maximized]\t{yes}\n[end]\n' > "${HOME}/.fluxbox/apps"
     fluxbox -display "${VNC_DISPLAY}" >>"${L}" 2>&1 &
     x11vnc -display "${VNC_DISPLAY}" -forever -shared -nopw -rfbport 5900 \

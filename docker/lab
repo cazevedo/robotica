@@ -9,8 +9,8 @@ set -o pipefail
 
 # `docker exec <container> lab ...` runs this script directly: no login shell,
 # no ~/.bashrc, so none of the ROS setup has happened. An interactive
-# `lab.ps1 shell` does read ~/.bashrc, which is why this only bites the
-# non-interactive path (`lab.ps1 doctor`, `lab.ps1 run ...`). Source it here so
+# `./lab.sh shell` does read ~/.bashrc, which is why this only bites the
+# non-interactive path (`./lab.sh doctor`, `./lab.sh run ...`). Source it here so
 # `lab` behaves the same however it was invoked.
 if [ -z "${ROS_DISTRO:-}" ] && [ -f /etc/profile.d/10-ros-lab.sh ]; then
     unset LAB_ROS_SETUP_DONE
@@ -58,7 +58,7 @@ ${E}Gazebo is switched OFF.${R}
 
   Turn it on for this session:      lab gazebo on
   Turn it on permanently:           set LAB_GAZEBO=1 in .env on the host,
-                                    then   .\\lab.ps1 restart
+                                    then   ./lab.sh restart
 
   Without Gazebo you can still run:  lab moveit   (RViz + fake controllers)
                                      lab real     (the physical Lite 6)
@@ -113,7 +113,7 @@ cmd_build() {
         say "xarm_ros2 is already built into the image at /opt/xarm_ws."
         return 0
     fi
-    say "building your packages in ~/dev_ws (src/ = ./src on Windows)"
+    say "building your packages in ~/dev_ws (src/ = ./src on the Mac)"
     run colcon build --symlink-install \
         --parallel-workers "${COLCON_JOBS:-2}" \
         --cmake-args -DCMAKE_BUILD_TYPE=Release "$@" || return $?
@@ -162,7 +162,7 @@ cmd_test() {
          run ros2 launch xarm_moveit_config lite6_moveit_fake.launch.py ;;
       4) say "Test 4 - the kinematic chain"
          echo "   Needs Test 3 running in another terminal."
-         echo "   The PDF is written to ~/shared, i.e. ./shared on Windows."
+         echo "   The PDF is written to ~/shared, i.e. ./shared on the Mac."
          echo
          cd "${HOME}/shared" || die "no ~/shared"
          run ros2 run tf2_tools view_frames ;;
@@ -185,7 +185,7 @@ cmd_test() {
       all|"")
          cat <<MSG
 The seven tests of Part 2. Run them in order, each in its own terminal
-(open one with:  .\\lab.ps1 shell  on Windows).
+(open one with:  ./lab.sh shell  on the Mac).
 
   lab test 1     ROS 2 core is alive          (then 'lab test 1b' elsewhere)
   lab test 2     UFACTORY packages visible
@@ -253,7 +253,7 @@ cmd_enable() {
 
 cmd_frames() {
     cd "${HOME}/shared" || die "no ~/shared"
-    say "writing frames_<timestamp>.pdf to ~/shared  (= ./shared on Windows)"
+    say "writing frames_<timestamp>.pdf to ~/shared  (= ./shared on the Mac)"
     echo
     run ros2 run tf2_tools view_frames
 }
@@ -322,7 +322,7 @@ cmd_doctor() {
         printf '  %-22s %s\n' "GL renderer" "$(glxinfo -B 2>/dev/null | awk -F': ' '/OpenGL renderer/{print $2}' || echo '?')"
     else
         printf '  %-22s %s\n' "X connection" "${E}no${R} - GUI apps will not open"
-        echo "     try:  DISPLAY_MODE=vnc  in .env, then  .\\lab.ps1 restart"
+        echo "     try:  DISPLAY_MODE=vnc  in .env, then  ./lab.sh restart"
         fail=1
     fi
     echo
@@ -365,7 +365,7 @@ lab - Robotics 02000537, Lab 0 (UFACTORY Lite 6 / ROS 2 Jazzy)
     lab gazebo on         allow it
     lab gazebo reset      go back to LAB_GAZEBO from .env
 
-  WORKSPACE            (~/dev_ws/src is ./src on your Windows disk)
+  WORKSPACE            (~/dev_ws/src is ./src on your Mac)
     lab build [args]      colcon build your packages
     lab clean             wipe build/ install/ log/
     lab overlay-xarm      copy xarm_ros2 into ~/dev_ws/src so you can edit it
@@ -374,7 +374,7 @@ lab - Robotics 02000537, Lab 0 (UFACTORY Lite 6 / ROS 2 Jazzy)
     lab tf [a] [b]        tf2_echo, default link_base -> link_eef
     lab frames            view_frames; PDF lands in ./shared
 
-Files you put in ~/shared appear in ./shared on Windows, and vice versa.
+Files you put in ~/shared appear in ./shared on the Mac, and vice versa.
 HELP
 }
 

@@ -2,7 +2,7 @@
 ###############################################################################
 # Container entrypoint.
 #
-#   1. sets up the display (WSLg passthrough, browser VNC, or an external X)
+#   1. sets up the display (browser VNC, or an external X such as XQuartz)
 #   2. sources ROS + underlay + overlay
 #   3. execs whatever you asked for (default: sleep infinity)
 ###############################################################################

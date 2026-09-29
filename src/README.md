@@ -1,7 +1,7 @@
 # `src/` — your workspace
 
 This folder **is** `~/dev_ws/src` inside the container. It is an ordinary folder
-on your Windows disk: edit it with VS Code, back it up, put it in git.
+on your Mac: edit it with VS Code, back it up, put it in git.
 
 Nothing else inside the container is permanent. Anything you want to keep goes
 here, or in `../shared/`.
@@ -11,7 +11,7 @@ lab build        # inside the container: colcon build, from ~/dev_ws
 ```
 
 The build output (`build/`, `install/`, `log/`) is deliberately *not* here — it
-lives in a Docker volume, where compilation is fast and Windows cannot trip
+lives in a Docker volume, where compilation is fast and the macOS file-sharing layer cannot trip
 over symlinks. That is why this folder stays clean.
 
 ## Starting a package
@@ -26,9 +26,9 @@ source ~/dev_ws/install/setup.bash
 
 ## Keeping your progress in git
 
-From Windows, in the folder that contains this one:
+From the Mac Terminal, in the folder that contains this one:
 
-```powershell
+```bash
 git init
 git add .
 git commit -m "Lab 0 environment"

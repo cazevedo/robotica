@@ -2,7 +2,6 @@
 # git's autocrlf says on Windows. A CRLF here produces the classic
 # "bad interpreter: /usr/bin/env bash^M" on container start.
 * text=auto eol=lf
-*.ps1 text eol=crlf
 docker/*    text eol=lf
 lab.sh      text eol=lf
 Dockerfile  text eol=lf

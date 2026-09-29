@@ -3,12 +3,12 @@
 # Give the container something to draw on.
 #
 #   DISPLAY_MODE=auto   use WSLg if it is there, otherwise fall back to vnc
-#   DISPLAY_MODE=wslg   Windows 11 + Docker Desktop: RViz/Gazebo open as
-#                       ordinary Windows windows. Fastest, nicest.
+#                       (on macOS there is no WSLg, so this is always vnc)
+#   DISPLAY_MODE=wslg   Windows 11 + Docker Desktop only.
 #   DISPLAY_MODE=vnc    run a virtual X server inside the container and serve
 #                       it at http://localhost:6080/ . Always works.
-#   DISPLAY_MODE=x11    an X server you run yourself (VcXsrv, X410, XQuartz).
-#                       Set DISPLAY yourself, e.g. host.docker.internal:0.0
+#   DISPLAY_MODE=x11    an X server you run yourself (XQuartz on macOS).
+#                       Defaults to host.docker.internal:0
 #   DISPLAY_MODE=none   headless. No GUI at all.
 #
 # Writes the resolved DISPLAY to /tmp/.lab-display and the mode actually used
@@ -89,7 +89,7 @@ case "${MODE}" in
         start_vnc || exit 1
         ;;
     x11)
-        export DISPLAY="${DISPLAY:-host.docker.internal:0.0}"
+        export DISPLAY="${DISPLAY:-host.docker.internal:0}"
         log "using external X server on ${DISPLAY}"
         ;;
     none)

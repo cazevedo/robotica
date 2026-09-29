@@ -1,52 +1,54 @@
-# Lab 0 environment — Windows / Docker
+# Lab 0 environment — macOS / Docker
 
 **Robotics (02000537) — 2026/2027** · UFACTORY Lite 6 · ROS 2 Jazzy Jalisco · MoveIt 2 · Gazebo Harmonic
 
-Path **C** of the Lab 0 handout, for Windows. Everything in Part 1 (Steps 1–8) is
+Path **C** of the Lab 0 handout, for macOS (Apple Silicon M1–M4, or Intel). Everything in Part 1 (Steps 1–8) is
 baked into the image — including the `xarm_ros2` clone and its `colcon build` — so
 that time is spent once, by `docker build`, and never again.
 
-> The `ubuntu` branch has the Linux version of the same environment. This branch
-> is Windows only. The [Dockerfile](Dockerfile) is commented step by step against
+> Adapted from the `windows` branch (the `ubuntu` branch is the Linux version).
+> This branch is macOS only. The image is built natively for your CPU — arm64 on
+> Apple Silicon — so nothing runs under Rosetta/QEMU emulation. The [Dockerfile](Dockerfile) is commented step by step against
 > the handout.
 
 ---
 
 ## First time
 
-Docker Desktop, on the WSL 2 based engine. It installs its own WSL distribution —
-you do **not** need `wsl --install`. No GPU required.
+Docker Desktop for Mac — pick **Apple Silicon** or **Intel** to match your Mac
+(Apple menu → About This Mac). No GPU required.
 
-```powershell
-winget install -e --id Docker.DockerDesktop
-```
+<https://www.docker.com/products/docker-desktop/>  (or, with Homebrew: `brew install --cask docker`)
 
-Then start Docker Desktop once and let it finish. In this folder:
+Start Docker Desktop once and let it finish. Then, in
+**Settings → Resources**, give it at least **8 GB of memory** and **60 GB of disk**
+— the build and Gazebo need both. In this folder, in the Mac Terminal:
 
-```powershell
-copy .env.example .env
+```bash
+cp .env.example .env
 ```
 
 Put your assigned `ROS_DOMAIN_ID` in `.env`, then build — once, mostly downloads:
 
-```powershell
-.\lab.ps1 build
+```bash
+./lab.sh build
 ```
 
-```powershell
-.\lab.ps1 up
+```bash
+./lab.sh up
 ```
 
-```powershell
-.\lab.ps1 doctor
+```bash
+./lab.sh doctor
 ```
 
 `doctor` checks ROS, the xarm packages, the display, the GL renderer and both
 workspaces. Run it before asking anyone anything.
 
-Every terminal after that is `.\lab.ps1 shell`, which drops you into the same
-running container. Inside, `lab` is the menu. `.\lab.ps1 down` stops everything;
-your work is kept. On Linux or in Git Bash, `./lab.sh` takes the same commands.
+Every terminal after that is `./lab.sh shell` (a new Terminal tab, ⌘T), which
+drops you into the same running container. Inside, `lab` is the menu.
+`./lab.sh vnc` opens the RViz/Gazebo desktop in your browser.
+`./lab.sh down` stops everything; your work is kept.
 
 ---
 
@@ -57,27 +59,27 @@ node. Write your node once and it runs against both.
 
 ## 1. In simulation
 
-```powershell
-.\lab.ps1 gazebo on
+```bash
+./lab.sh gazebo on
 ```
 
 **Terminal 1** — Gazebo, MoveIt and `ros2_control`, all from one launch:
 
-```powershell
-.\lab.ps1 shell
+```bash
+./lab.sh shell
 ```
 
 ```bash
 lab sim
 ```
 
-Wait for the Lite 6 to appear in the Gazebo window standing under gravity — up to
+Open `./lab.sh vnc` in another Mac terminal and wait for the Lite 6 to appear in the Gazebo window standing under gravity — up to
 a minute, and several minutes the very first time while Gazebo downloads models.
 
 **Terminal 2** — your node:
 
-```powershell
-.\lab.ps1 shell
+```bash
+./lab.sh shell
 ```
 
 ```bash
@@ -91,8 +93,8 @@ the gate.
 
 **Terminal 1** — the same stack, with real hardware underneath:
 
-```powershell
-.\lab.ps1 shell
+```bash
+./lab.sh shell
 ```
 
 ```bash
@@ -101,8 +103,8 @@ lab real 192.168.1.xxx
 
 **Terminal 2** — the *identical* command as in simulation, not edited:
 
-```powershell
-.\lab.ps1 shell
+```bash
+./lab.sh shell
 ```
 
 ```bash
@@ -197,7 +199,7 @@ package.
 | 1 — ROS 2 core is alive | `lab test 1`, and `lab test 1b` in a second terminal | no |
 | 2 — UFACTORY packages visible | `lab test 2` | no |
 | 3 — robot model loads | `lab test 3` *(leave running)* | no |
-| 4 — kinematic chain | `lab test 4` → PDF in `.\shared\` | no |
+| 4 — kinematic chain | `lab test 4` → PDF in `./shared/` | no |
 | 5 — read a transform | `lab test 5` | no |
 | 6 — Gazebo on its own | `lab test 6` | **yes** |
 | 7 — Lite 6 in Gazebo under MoveIt | `lab test 7` | **yes** |
@@ -216,8 +218,8 @@ failure, the **first** error message as text.
 Gazebo is a physics engine; under software rendering it uses every core you have.
 When you are driving the real arm you do not want it near your CPU.
 
-```powershell
-.\lab.ps1 gazebo off
+```bash
+./lab.sh gazebo off
 ```
 
 `lab sim`, `lab gz` and tests 6–7 then refuse to start and say why — nothing can
@@ -233,38 +235,50 @@ on|off`, and `lab gazebo reset` hands control back to `.env`.
 
 ## Where the windows appear
 
-`DISPLAY_MODE` in `.env`, default `auto`: WSLg if Docker Desktop exposes it —
-RViz and Gazebo open as ordinary Windows windows — otherwise a noVNC desktop at
-<http://localhost:6080/> (`.\lab.ps1 vnc`). Force either with `wslg` or `vnc`;
-`x11` is for your own VcXsrv/X410, `none` is headless.
+macOS has no WSLg and Docker on the Mac has no X server of its own, so the
+default is `DISPLAY_MODE=vnc`: a virtual desktop inside the container, served
+at <http://localhost:6080/>. `./lab.sh vnc` opens it (no password). Every RViz
+and Gazebo window appears there.
+
+Want native Mac windows instead? Install [XQuartz](https://www.xquartz.org/),
+tick **Settings → Security → Allow connections from network clients**, log out
+and back in, then in a Mac terminal:
+
+```bash
+xhost +localhost
+```
+
+and set `DISPLAY_MODE=x11` in `.env`, then `./lab.sh restart`. RViz works well
+this way; Gazebo is usually happier on `vnc`. `none` is headless.
 
 If `lab test 3` opens nothing, `lab doctor` says whether the container can reach
-an X server at all. Usual fix: `DISPLAY_MODE=vnc`, then `.\lab.ps1 restart`.
+an X server at all. Usual fix: `DISPLAY_MODE=vnc`, then `./lab.sh restart`.
 
-Rendering is `LIBGL_ALWAYS_SOFTWARE=1` — Docker Desktop gives the container no
-GPU. RViz is comfortable, Gazebo is slow but usable. That is the expected Path C
-experience; say so when you submit if it is unusable.
+Rendering is `LIBGL_ALWAYS_SOFTWARE=1` — Docker on macOS gives the container no
+GPU. RViz is comfortable, Gazebo is slow but usable (Apple Silicon handles it
+better than most laptops). That is the expected Path C experience; say so when
+you submit if it is unusable.
 
 ---
 
 ## Where your work lives
 
-| On Windows | In the container | |
+| On your Mac | In the container | |
 |---|---|---|
-| `.\src\` | `~/dev_ws/src` | your packages — survives everything, including `nuke` |
-| `.\shared\` | `~/shared` | files in and out (the `view_frames` PDF, notes) |
+| `./src/` | `~/dev_ws/src` | your packages — survives everything, including `nuke` |
+| `./shared/` | `~/shared` | files in and out (the `view_frames` PDF, notes) |
 | — | `~/dev_ws/{build,install,log}` | Docker volume; `nuke` deletes it, `lab build` recreates it |
 | — | `/opt/xarm_ws` | xarm_ros2, pre-built into the image |
 
-`.\src\` is a bind mount — the same bytes under two names, no copy and no sync.
-Edit in VS Code on Windows, build and run in the container shell. Build artefacts
-stay in a Docker volume deliberately: compiling across the Windows/VM boundary is
-slow, and `--symlink-install` needs symlinks that are unreliable there.
+`./src/` is a bind mount — the same bytes under two names, no copy and no sync.
+Edit in VS Code on the Mac, build and run in the container shell. Build artefacts
+stay in a Docker volume deliberately: compiling across the macOS/VM file-sharing
+boundary is slow, and `--symlink-install` wants a native Linux filesystem.
 
 **Anything else in the container is disposable.** A `pip install` or `apt install`
 disappears when the container is recreated — put it in the `Dockerfile`.
 
-`.\lab.ps1 code` opens VS Code; choose **Reopen in Container** for an editor and
+`./lab.sh code` opens VS Code; choose **Reopen in Container** for an editor and
 debugger running inside, with ROS sourced.
 
 Workspace layering is `/opt/ros/jazzy` → `/opt/xarm_ws` → `~/dev_ws`, all sourced
@@ -277,20 +291,21 @@ which is what `lab overlay-xarm` is for if you ever need to modify `xarm_ros2`.
 
 | Symptom | Do this |
 |---|---|
-| `Docker is not installed (or not on PATH)` | Install it. If you just did, `lab.ps1` re-reads PATH itself — this means it really is absent. |
-| `the engine is not responding` | Docker Desktop installed but not started. Launch it, wait for the whale to settle. |
+| `Docker is not installed (or not on PATH)` | Install Docker Desktop for Mac. `lab.sh` also looks in `/Applications/Docker.app` itself, so this means it really is absent. |
+| `the Docker engine is not responding` | Docker Desktop installed but not started. Launch it, wait for the whale in the menu bar to settle. |
 | Build fails | The **first** error matters, not the last. Scroll up. |
-| Build killed / machine freezes | Lower `COLCON_JOBS` in `.env`, then `.\lab.ps1 rebuild`. |
+| Build killed / machine freezes | Give Docker more memory (Settings → Resources) or lower `COLCON_JOBS` in `.env`, then `./lab.sh rebuild`. |
 | `no action server on /lite6_traj_controller/...` | You are on `lab driver`, which has no `controller_manager`. Use `lab sim` or `lab real`. |
 | Service calls ignored, arm does not move | Two owners. `ros2 topic echo /ufactory/robot_states --once` — mode 1 means `ros2_control` has it. |
 | `ros2: command not found` inside | A shell that skipped `~/.bashrc`. Run `bash -l`. |
-| RViz/Gazebo open nothing | `lab doctor`, then `DISPLAY_MODE=vnc` + `.\lab.ps1 restart`. |
+| RViz/Gazebo open nothing | `lab doctor`, then `DISPLAY_MODE=vnc` + `./lab.sh restart`. |
 | Gazebo hangs for minutes on first launch | Normal — Fuel models and shaders, cached in a volume, once only. |
 | A deleted node still shows in `ros2 pkg executables` | `colcon` never prunes `install/`. `lab clean`, then `lab build`. |
-| Everything is confused | `.\lab.ps1 nuke` then `.\lab.ps1 up`. `.\src` and `.\shared` survive. |
-| `xarm_ros2` upstream moved | `.\lab.ps1 rebuild-xarm` — fresh recursive clone and build. |
+| Everything is confused | `./lab.sh nuke` then `./lab.sh up`. `./src` and `./shared` survive. |
+| `xarm_ros2` upstream moved | `./lab.sh rebuild-xarm` — fresh recursive clone and build. |
+| `permission denied: ./lab.sh` | `chmod +x lab.sh` |
 
-Container logs are UTC; your Windows clock is local. Timestamps will look offset.
+Container logs are UTC; your Mac clock is local. Timestamps will look offset.
 
 ---
 
@@ -300,11 +315,11 @@ Container logs are UTC; your Windows clock is local. Timestamps will look offset
 Dockerfile              Steps 1-8 of the handout, commented per step
 docker-compose.yml      volumes, display, ports, the LAB_GAZEBO switch
 .env.example            settings template (ROS_DOMAIN_ID, Gazebo, display)
-lab.ps1 / lab.sh        host driver: build / up / shell / gazebo / doctor
+lab.sh                  host driver: build / up / shell / vnc / gazebo / doctor
 docker/lab              in-container helper: the seven tests and the launches
 docker/entrypoint.sh    sources ROS, sets up the display, prints the banner
 docker/ros_setup.sh     Step 7 of the handout, sourced by every shell
-docker/start-display    WSLg / VNC / external X
+docker/start-display    VNC (browser) / external X (XQuartz)
 .devcontainer/          VS Code "Reopen in Container"
 src/lite6_control/      worked example ROS 2 Python package
 src/                    YOUR packages     (= ~/dev_ws/src)

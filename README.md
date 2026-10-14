@@ -173,6 +173,7 @@ ros2 topic echo /ufactory/robot_states --once
 | `joint_echo` | anything | minimal subscriber: subscribe, spin, print |
 | `move_joints_demo` | `lab driver` | self-contained; the driver API, read and command |
 | `jog_demo` | `lab driver` | one joint at a time, via the reusable `Lite6Client` |
+| `fk_check` | `lab sim`, `lab real` | Labwork 1, from `src/lite6_kinematics`: you implement the forward kinematics, it checks them against the model and the robot — see [its README](src/lite6_kinematics/README.md) |
 
 Start your own package in `src/`:
 
@@ -332,6 +333,7 @@ docker/ros_setup.sh     Step 7 of the handout, sourced by every shell
 docker/start-display    host X / VNC (WSLg on the windows branch)
 .devcontainer/          VS Code "Reopen in Container"
 src/lite6_control/      worked example ROS 2 Python package
+src/lite6_kinematics/   Labwork 1: forward kinematics (template + checker)
 src/                    YOUR packages     (= ~/dev_ws/src)
 shared/                 files in and out  (= ~/shared)
 ```

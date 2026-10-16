@@ -3,12 +3,14 @@
     python3 -m pytest ~/dev_ws/src/lite6_kinematics/test -v
 
 These check structure, units and internal consistency - not whether your DH
-table is right. That is what fk_check (Gazebo, then the arm) is for.
+table is right. That is what fk_check (Gazebo, then the arm) is for. The node
+test needs ROS, so it runs inside the container and is skipped elsewhere.
 """
 
 import ast
 import os
 import sys
+import time
 
 import numpy as np
 import pytest
@@ -19,7 +21,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 from lite6_kinematics import forward_kinematics as fk  # noqa: E402
 
 SOURCE = os.path.join(os.path.dirname(HERE), 'lite6_kinematics', 'forward_kinematics.py')
-ALLOWED_IMPORTS = {'numpy', 'math', 'typing', '__future__'}
+ALLOWED_IMPORTS = {'numpy', 'math', 'typing', '__future__', 'rclpy', 'sensor_msgs', 'geometry_msgs'}
 
 # Joint ranges of the xarm_description model (rad), used only to draw samples.
 LOW = np.array([-3.11, -2.61, -0.06, -3.11, -2.16, -3.11])
@@ -53,7 +55,7 @@ def _rz(a):
 
 
 # --- rules --------------------------------------------------------------------
-def test_only_numpy_and_math_are_imported():
+def test_only_allowed_modules_are_imported():
     tree = ast.parse(open(SOURCE).read())
     used = set()
     for node in ast.walk(tree):
@@ -167,3 +169,71 @@ def test_pose_degenerate_pitch(pitch):
     p = np.asarray(fk.pose_from_transform(T), dtype=float)
     assert p[5] == 0.0
     assert np.allclose(_rz(p[5]) @ _ry(p[4]) @ _rx(p[3]), T[:3, :3], atol=1e-9)
+
+
+# --- quaternion_from_matrix (provided; passes from day one) ---------------------------
+def _matrix_from_quaternion(q):
+    x, y, z, w = q
+    return np.array([
+        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+        [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+
+
+@pytest.mark.parametrize('R', [
+    np.eye(3),
+    _rz(0.7) @ _ry(-0.4) @ _rx(1.1),
+    _rx(np.pi),
+    _ry(np.pi),
+    _rz(np.pi),
+    _rz(2.9) @ _ry(0.3) @ _rx(-3.0),
+])
+def test_quaternion_from_matrix(R):
+    q = np.asarray(fk.quaternion_from_matrix(R), dtype=float)
+    assert q.shape == (4,) and abs(np.linalg.norm(q) - 1.0) < 1e-12 and q[3] >= 0.0
+    assert np.allclose(_matrix_from_quaternion(q), R, atol=1e-12)
+
+
+# --- the node (needs ROS) -----------------------------------------------------------------
+def test_node_publishes_the_pose_of_the_joint_states():
+    rclpy = pytest.importorskip('rclpy')
+    from geometry_msgs.msg import PoseStamped
+    from rclpy.node import Node
+    from sensor_msgs.msg import JointState
+
+    prefix = f'/lw1_test_{os.getpid()}'
+    q = SAMPLES[3]
+    order = [3, 0, 5, 1, 4, 2]                  # shuffled, plus a joint that is not ours
+    msg = JointState()
+    msg.header.stamp.sec, msg.header.stamp.nanosec = 123, 456789
+    msg.name = [f'joint{i + 1}' for i in order] + ['gripper']
+    msg.position = [float(q[i]) for i in order] + [0.5]
+
+    rclpy.init(args=[])
+    got = []
+    try:
+        node = fk.FkNode(joint_states_topic=prefix + '/joint_states', pose_topic=prefix + '/pose')
+        helper = Node('lw1_test_helper')
+        helper.create_subscription(PoseStamped, prefix + '/pose', got.append, 10)
+        pub = helper.create_publisher(JointState, prefix + '/joint_states', 10)
+        end = time.monotonic() + 10.0
+        while not got and time.monotonic() < end:
+            pub.publish(msg)
+            rclpy.spin_once(node, timeout_sec=0.05)
+            rclpy.spin_once(helper, timeout_sec=0.05)
+        node.destroy_node()
+        helper.destroy_node()
+    finally:
+        rclpy.shutdown()
+
+    assert got, 'the node published nothing on pose_topic'
+    p = got[0]
+    assert p.header.frame_id == 'link_base'
+    assert (p.header.stamp.sec, p.header.stamp.nanosec) == (123, 456789), \
+        'header.stamp must be the stamp of the JointState'
+    T = np.asarray(fk.forward_kinematics(q), dtype=float)
+    pos = [p.pose.position.x, p.pose.position.y, p.pose.position.z]
+    o = p.pose.orientation
+    assert np.allclose(pos, T[:3, 3], atol=1e-9), 'position: metres, from forward_kinematics(q)'
+    assert np.allclose(_matrix_from_quaternion([o.x, o.y, o.z, o.w]), T[:3, :3], atol=1e-9), \
+        'orientation: the rotation of forward_kinematics(q), quaternion order x, y, z, w'

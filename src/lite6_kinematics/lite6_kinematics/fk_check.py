@@ -1,14 +1,19 @@
 """fk_check - LW1 forward-kinematics checker. PROVIDED, DO NOT EDIT.
 
 Moves the Lite 6 through the poses in config/lw1_poses.yaml and, at each one,
-compares YOUR forward_kinematics() with independent references:
+compares the pose that YOUR fk_node publishes on /lite6_fk/pose with
+independent references:
 
     tf          link_base -> link_eef, from robot_state_publisher   (sim, real)
     controller  the pose the arm's own controller reports,          (real only)
                 /ufactory/robot_states, TCP offset removed
 
+The pose is matched to the joint angles it was computed from by its
+header.stamp, which must be the stamp of the JointState your node received.
+
 Terminal 1:   lab sim                         |  lab real <robot_ip>
-Terminal 2:   ros2 run lite6_kinematics fk_check --ros-args -p robot:=sim
+Terminal 2:   ros2 run lite6_kinematics fk_node
+Terminal 3:   ros2 run lite6_kinematics fk_check --ros-args -p robot:=sim
               ros2 run lite6_kinematics fk_check --ros-args -p robot:=real
 
 Results go to ~/shared/lw1_fk_<robot>.csv (= ./shared/ on your machine).
@@ -22,6 +27,7 @@ import math
 import os
 import sys
 import time
+from collections import OrderedDict
 
 import numpy as np
 import rclpy
@@ -29,6 +35,7 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 from builtin_interfaces.msg import Duration
 from control_msgs.action import FollowJointTrajectory
+from geometry_msgs.msg import PoseStamped
 from rclpy.action import ActionClient
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
@@ -37,9 +44,10 @@ from sensor_msgs.msg import JointState
 from tf2_ros import Buffer, TransformListener
 from trajectory_msgs.msg import JointTrajectoryPoint
 
-from lite6_kinematics import forward_kinematics as student
 from lite6_kinematics.checking import (controller_eef_pose, is_homogeneous,
-                                       pose_errors, transform_stamped_to_matrix)
+                                       pose_errors, pose_stamped_to_matrix,
+                                       transform_stamped_to_matrix)
+from lite6_kinematics.forward_kinematics import pose_from_transform
 
 JOINT_NAMES = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6']
 
@@ -54,6 +62,7 @@ class FkCheck(Node):
         self.declare_parameter('base_frame', 'link_base')
         self.declare_parameter('eef_frame', 'link_eef')
         self.declare_parameter('joint_states_topic', '/joint_states')
+        self.declare_parameter('pose_topic', '/lite6_fk/pose')
         self.declare_parameter('robot_states_topic', '/ufactory/robot_states')
         self.declare_parameter('action', '/lite6_traj_controller/follow_joint_trajectory')
         self.declare_parameter('max_speed', 0.35)      # rad/s, slowest joint sets the time
@@ -68,8 +77,14 @@ class FkCheck(Node):
 
         self._q = None
         self._robot_msg = None
+        self._pose = None
+        self._states = OrderedDict()        # recent joint states, by header.stamp
+        # Deep queue: joint states can arrive at hundreds of Hz, and the one that
+        # matches your pose by stamp must not be dropped.
         self.create_subscription(JointState, self.get_parameter('joint_states_topic').value,
-                                 self._on_joint_state, 10)
+                                 self._on_joint_state, 1000)
+        self.create_subscription(PoseStamped, self.get_parameter('pose_topic').value,
+                                 self._on_pose, 10)
         if self.robot == 'real':
             from xarm_msgs.msg import RobotMsg
             self.create_subscription(RobotMsg, self.get_parameter('robot_states_topic').value,
@@ -85,6 +100,12 @@ class FkCheck(Node):
         index = {name: i for i, name in enumerate(msg.name)}
         if all(n in index for n in JOINT_NAMES):
             self._q = np.array([msg.position[index[n]] for n in JOINT_NAMES])
+            self._states[(msg.header.stamp.sec, msg.header.stamp.nanosec)] = self._q
+            while len(self._states) > 500:
+                self._states.popitem(last=False)
+
+    def _on_pose(self, msg):
+        self._pose = msg
 
     def _on_robot_msg(self, msg):
         self._robot_msg = msg
@@ -140,12 +161,32 @@ class FkCheck(Node):
             self.get_logger().warn(f'controller reported error_code={code}; measuring the reached pose')
 
     # --- measurement ----------------------------------------------------------
+    def matched_pose(self):
+        """The latest pose from your node, and the joint angles it was computed from."""
+        self.spin_for(0.3)                  # let the latest messages in
+        topic = self.get_parameter('pose_topic').value
+        end = time.monotonic() + 3.0
+        while True:
+            msg = self._pose
+            if msg.header.frame_id != self.base:
+                raise RuntimeError(f"the pose on {topic} has header.frame_id '{msg.header.frame_id}', "
+                                   f"expected '{self.base}'")
+            key = (msg.header.stamp.sec, msg.header.stamp.nanosec)
+            if key in self._states:
+                return self._states[key].copy(), msg
+            if time.monotonic() > end:
+                raise RuntimeError(f'the pose on {topic} has a header.stamp that is not the stamp of a '
+                                   'recent /joint_states message: copy msg.header.stamp from the JointState '
+                                   'into the PoseStamped, and keep fk_node running')
+            rclpy.spin_once(self, timeout_sec=0.05)
+
     def measure(self, name):
-        q = self._q.copy()
-        T_student = np.asarray(student.forward_kinematics(q), dtype=float)
+        q, pose_msg = self.matched_pose()
+        T_student = pose_stamped_to_matrix(pose_msg)
         if not is_homogeneous(T_student):
-            raise RuntimeError('forward_kinematics() did not return a 4x4 rigid-body transform')
-        pose = np.asarray(student.pose_from_transform(T_student), dtype=float)
+            raise RuntimeError('the pose from your node is not a valid rigid-body pose '
+                               '(is the quaternion normalised, in the order x, y, z, w?)')
+        pose = pose_from_transform(T_student)
         row = {'pose': name, 'robot': self.robot, 'time': time.strftime('%Y-%m-%dT%H:%M:%S')}
         row.update({f'q{i + 1}': q[i] for i in range(6)})
         row.update(_flat('student', T_student))
@@ -174,15 +215,14 @@ class FkCheck(Node):
 
     # --- the procedure ----------------------------------------------------------
     def run(self):
-        # Before anything moves: is forward_kinematics() implemented at all?
-        # (An unimplemented template raises NotImplementedError here, and the
-        # arm never leaves where it is.)
-        if not is_homogeneous(student.forward_kinematics(np.zeros(6))):
-            raise RuntimeError('forward_kinematics() did not return a 4x4 rigid-body transform')
-        student.pose_from_transform(np.eye(4))
-
         self.wait_until(lambda: self._q is not None, 15.0,
                         f'/joint_states with {JOINT_NAMES} - is lab {self.robot} running?')
+        # Before anything moves: is your node publishing, and is the pose usable?
+        # (The arm never leaves where it is if it is not.)
+        self.wait_until(lambda: self._pose is not None, 15.0,
+                        f"a pose on {self.get_parameter('pose_topic').value} - "
+                        'is your node running? (ros2 run lite6_kinematics fk_node)')
+        self.matched_pose()
         self.wait_until(lambda: self.tf_buffer.can_transform(self.base, self.eef, Time()), 15.0,
                         f'tf {self.base} -> {self.eef}')
         if self.robot == 'real':
@@ -259,9 +299,6 @@ def main(args=None):
     status = 0
     try:
         node.run()
-    except NotImplementedError as e:
-        print(f'\n{e}\nImplement it in lite6_kinematics/forward_kinematics.py first.', file=sys.stderr)
-        status = 1
     except (KeyboardInterrupt, ExternalShutdownException):
         # Quitting does not cancel a goal already sent: the arm finishes that
         # motion. Only the emergency stop halts it.

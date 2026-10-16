@@ -1,19 +1,26 @@
-"""Labwork 1 - forward kinematics of the UFACTORY Lite 6.
+"""Labwork 1 - forward kinematics of the UFACTORY Lite 6, as a ROS 2 node.
 
 THIS IS THE ONLY FILE YOU EDIT IN LABWORK 1.
 
-Implement these three functions, replacing every ``raise NotImplementedError``:
+Implement the following, replacing every ``raise NotImplementedError``:
 
-    dh_table(q)                        the modified DH table for a joint vector
-    mdh_transform(a, alpha, d, theta)  one link transform, ^{i-1}_i T
-    forward_kinematics(q, all_frames)  ^0_6 T, or all seven frames ^0_i T
+    Part B - the maths (no ROS needed)
+        dh_table(q)                        the modified DH table for a joint vector
+        mdh_transform(a, alpha, d, theta)  one link transform, ^{i-1}_i T
+        forward_kinematics(q, all_frames)  ^0_6 T, or all seven frames ^0_i T
 
-``pose_from_transform(T)`` at the bottom is PROVIDED: already implemented, do
-not edit it.
+    Part C - the node
+        FkNode                             reads /joint_states, publishes the
+                                           pose of the end-effector
 
-Keep the function names, arguments and return types exactly as they are: the
-checker node (``fk_check``), the tests in ``test/`` and the instructor's grader
-all call these functions by name.
+Run the node with ``ros2 run lite6_kinematics fk_node``.
+
+``pose_from_transform``, ``quaternion_from_matrix`` and ``main`` at the bottom
+are PROVIDED: already implemented, do not edit them.
+
+Keep the function and class names, arguments and return types exactly as they
+are: the checker node (``fk_check``), the tests in ``test/`` and the
+instructor's grader all use them by name.
 
 Conventions - fixed, not yours to choose:
 
@@ -25,15 +32,33 @@ Conventions - fixed, not yours to choose:
       (q = 0 is the controller's zero configuration).
     * Lengths in METRES.
 
-Allowed imports: ``numpy`` and ``math``. Nothing else - no MoveIt, no
-kinematics library, no URDF parser, no tf. ``numpy`` does the linear algebra
-(``@`` for matrix products, ``np.cos``, ``np.eye``...); the robotics is yours.
+Allowed imports: ``numpy`` and ``math`` for the maths, and ``rclpy``,
+``sensor_msgs`` and ``geometry_msgs`` for the node (already imported below).
+Nothing else - no MoveIt, no kinematics library, no URDF parser, no tf.
+``numpy`` does the linear algebra (``@`` for matrix products, ``np.cos``,
+``np.eye``...); the robotics is yours.
 ``test/test_forward_kinematics.py`` checks the imports.
 """
 
 import numpy as np
 
+try:
+    import rclpy
+    from geometry_msgs.msg import PoseStamped
+    from rclpy.executors import ExternalShutdownException
+    from rclpy.node import Node
+    from sensor_msgs.msg import JointState
+except ImportError:         # the maths and its unit tests also run without ROS
+    rclpy = None
+    Node = object
 
+JOINT_NAMES = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6']
+BASE_FRAME = 'link_base'
+
+
+# =============================================================================
+# Part B - the maths
+# =============================================================================
 def dh_table(q) -> np.ndarray:
     """Modified DH parameters of the Lite 6 for joint vector q.
 
@@ -91,6 +116,47 @@ def forward_kinematics(q, all_frames: bool = False):
 
 
 # =============================================================================
+# Part C - the node
+# =============================================================================
+class FkNode(Node):
+    """Reads the joint angles and publishes the pose of the end-effector.
+
+    Subscribes   joint_states_topic   sensor_msgs/JointState    (/joint_states)
+    Publishes    pose_topic           geometry_msgs/PoseStamped (/lite6_fk/pose)
+
+    The published message is the pose of link_eef in link_base:
+        header.frame_id  BASE_FRAME
+        header.stamp     the stamp of the JointState it was computed from
+                         (copy it: fk_check matches the pose to the joint
+                         angles by this stamp)
+        pose.position    x, y, z in metres, from ^0_6 T
+        pose.orientation the rotation of ^0_6 T as a quaternion; use
+                         quaternion_from_matrix(), which is provided
+
+    The topic names are constructor arguments so that the tests can run the
+    node on private topics: use them, do not write the names again.
+    """
+
+    def __init__(self, joint_states_topic='/joint_states', pose_topic='/lite6_fk/pose'):
+        super().__init__('fk_node')
+        # TODO (LW1, Part C): create the publisher on pose_topic and the
+        # subscription on joint_states_topic (callback: self.on_joint_state).
+        raise NotImplementedError('FkNode.__init__ is not implemented yet')
+
+    def on_joint_state(self, msg):
+        """Called for every JointState: compute the pose and publish it."""
+        # TODO (LW1, Part C)
+        #   1. q = the angles of JOINT_NAMES, picked BY NAME from msg.name /
+        #      msg.position. The order is not promised and the message may
+        #      carry other joints: never use the index.
+        #   2. T = forward_kinematics(q)
+        #   3. fill a PoseStamped as described in the class docstring
+        #   4. publish it
+        # Keep it short and non-blocking: this runs inside the spin.
+        raise NotImplementedError('FkNode.on_joint_state is not implemented yet')
+
+
+# =============================================================================
 # PROVIDED - DO NOT EDIT. Already implemented; nothing below is yours to change.
 # =============================================================================
 def pose_from_transform(T) -> np.ndarray:
@@ -124,3 +190,55 @@ def pose_from_transform(T) -> np.ndarray:
     else:                      # pitch = -90 deg
         yaw, roll = 0.0, -np.arctan2(r[0, 1], r[1, 1])
     return np.array([T[0, 3], T[1, 3], T[2, 3], roll, pitch, yaw])
+
+
+def quaternion_from_matrix(R) -> np.ndarray:
+    """Unit quaternion (x, y, z, w) of a 3x3 rotation matrix, with w >= 0.
+
+    This is the order of geometry_msgs/Quaternion: msg.x, msg.y, msg.z, msg.w.
+    """
+    R = np.asarray(R, dtype=float)
+    t = R[0, 0] + R[1, 1] + R[2, 2]
+    if t > 0.0:
+        s = 2.0 * np.sqrt(t + 1.0)
+        w, x, y, z = s / 4.0, (R[2, 1] - R[1, 2]) / s, (R[0, 2] - R[2, 0]) / s, (R[1, 0] - R[0, 1]) / s
+    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+        s = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
+        w, x, y, z = (R[2, 1] - R[1, 2]) / s, s / 4.0, (R[0, 1] + R[1, 0]) / s, (R[0, 2] + R[2, 0]) / s
+    elif R[1, 1] > R[2, 2]:
+        s = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
+        w, x, y, z = (R[0, 2] - R[2, 0]) / s, (R[0, 1] + R[1, 0]) / s, s / 4.0, (R[1, 2] + R[2, 1]) / s
+    else:
+        s = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
+        w, x, y, z = (R[1, 0] - R[0, 1]) / s, (R[0, 2] + R[2, 0]) / s, (R[1, 2] + R[2, 1]) / s, s / 4.0
+    q = np.array([x, y, z, w])
+    q /= np.linalg.norm(q)
+    return q if q[3] >= 0.0 else -q
+
+
+def main(args=None):
+    """Entry point of ``ros2 run lite6_kinematics fk_node``."""
+    if rclpy is None:
+        raise SystemExit('ROS 2 is not available here: run this inside the container.')
+    rclpy.init(args=args)
+    node = None
+    status = 0
+    try:
+        node = FkNode()
+        node.get_logger().info('fk_node running: joint states in, pose out')
+        rclpy.spin(node)
+    except NotImplementedError as e:
+        print(f'\n{e}\nImplement it in lite6_kinematics/forward_kinematics.py first.')
+        status = 1
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+    return status
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

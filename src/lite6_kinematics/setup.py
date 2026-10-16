@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'fk_node = lite6_kinematics.forward_kinematics:main',
             'fk_check = lite6_kinematics.fk_check:main',
         ],
     },

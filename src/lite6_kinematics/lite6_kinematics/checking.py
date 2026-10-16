@@ -56,6 +56,15 @@ def transform_stamped_to_matrix(ts) -> np.ndarray:
     return T
 
 
+def pose_stamped_to_matrix(ps) -> np.ndarray:
+    """4x4 from a geometry_msgs/PoseStamped."""
+    p, o = ps.pose.position, ps.pose.orientation
+    T = np.eye(4)
+    T[:3, :3] = quaternion_to_matrix(o.x, o.y, o.z, o.w)
+    T[:3, 3] = (p.x, p.y, p.z)
+    return T
+
+
 def controller_eef_pose(pose, tcp_offset) -> np.ndarray:
     """^0_6 T from an xarm_msgs/RobotMsg.
 

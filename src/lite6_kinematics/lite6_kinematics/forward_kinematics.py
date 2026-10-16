@@ -4,7 +4,7 @@ THIS IS THE ONLY FILE YOU EDIT IN LABWORK 1.
 
 Implement these three functions, replacing every ``raise NotImplementedError``:
 
-    dh_table()                         the modified DH table, with joint offsets
+    dh_table(q)                        the modified DH table for a joint vector
     mdh_transform(a, alpha, d, theta)  one link transform, ^{i-1}_i T
     forward_kinematics(q, all_frames)  ^0_6 T, or all seven frames ^0_i T
 
@@ -34,18 +34,24 @@ kinematics library, no URDF parser, no tf. ``numpy`` does the linear algebra
 import numpy as np
 
 
-def dh_table() -> np.ndarray:
-    """Modified DH parameters of the Lite 6.
+def dh_table(q) -> np.ndarray:
+    """Modified DH parameters of the Lite 6 for joint vector q.
+
+    Args:
+        q: six joint angles (rad), controller convention, order joint1..joint6.
 
     Returns:
         A (6, 4) float array. Row i-1 (i = 1..6) holds, in this order:
 
-            [ a_{i-1} (m),  alpha_{i-1} (rad),  d_i (m),  theta_offset_i (rad) ]
+            [ a_{i-1} (m),  alpha_{i-1} (rad),  d_i (m),  theta_i (rad) ]
 
-        theta_offset_i is the constant added to the controller's joint angle
-        q_i to obtain the DH joint angle:  theta_i = q_i + theta_offset_i.
+        theta_i is the DH joint angle: the joint angle plus the constant
+        offset between your frames and the controller's zero,
+        theta_i = q_i + theta_offset_i. So dh_table(zeros(6)) is the table
+        with the offsets alone.
     """
-    # TODO (LW1, Part B): the table you derived in Part A.
+    # TODO (LW1, Part B): the table you derived in Part A, with the joint
+    # angles added to the theta column.
     raise NotImplementedError('dh_table() is not implemented yet')
 
 
@@ -77,10 +83,10 @@ def forward_kinematics(q, all_frames: bool = False):
         all_frames=True:  list of seven (4, 4) arrays
                           [^0_0 T (identity), ^0_1 T, ^0_2 T, ..., ^0_6 T].
 
-    Uses dh_table() and mdh_transform(), joint offsets applied.
+    Uses dh_table(q) and mdh_transform().
     """
-    # TODO (LW1, Part B): for each row of dh_table(), theta_i = q_i + theta_offset_i;
-    # chain the transforms from mdh_transform(), starting from the identity.
+    # TODO (LW1, Part B): chain mdh_transform() over the rows of dh_table(q),
+    # starting from the identity.
     raise NotImplementedError('forward_kinematics() is not implemented yet')
 
 

@@ -68,12 +68,20 @@ def test_only_numpy_and_math_are_imported():
 
 # --- dh_table -------------------------------------------------------------------
 def test_dh_table_shape_and_units():
-    t = np.asarray(fk.dh_table(), dtype=float)
-    assert t.shape == (6, 4), 'dh_table() must be (6, 4): [a_{i-1}, alpha_{i-1}, d_i, theta_offset_i]'
+    t = np.asarray(fk.dh_table(np.zeros(6)), dtype=float)
+    assert t.shape == (6, 4), 'dh_table(q) must be (6, 4): [a_{i-1}, alpha_{i-1}, d_i, theta_i]'
     assert np.all(np.isfinite(t))
     assert np.all(np.abs(t[:, [0, 2]]) < 0.5), 'lengths look like millimetres: use metres'
     assert np.all(np.abs(t[:, [1, 3]]) <= 2 * np.pi + 1e-9), 'angles look like degrees: use radians'
     assert np.any(t[:, [0, 2]] != 0), 'the table is still empty'
+
+
+def test_dh_table_theta_column_is_q_plus_offset():
+    q = SAMPLES[0]
+    t0 = np.asarray(fk.dh_table(np.zeros(6)), dtype=float)
+    tq = np.asarray(fk.dh_table(q), dtype=float)
+    assert np.allclose(tq[:, [0, 1, 2]], t0[:, [0, 1, 2]]), 'a, alpha and d must not depend on q'
+    assert np.allclose(tq[:, 3] - t0[:, 3], q), 'theta_i must be q_i + a constant offset'
 
 
 # --- mdh_transform ----------------------------------------------------------------
@@ -112,13 +120,12 @@ def test_all_frames_structure():
 
 def test_frames_chain_dh_table_and_mdh_transform():
     # Each frame is the previous one times the link transform of the next row
-    # of dh_table(), with theta_i = q_i + theta_offset_i.
-    table = np.asarray(fk.dh_table(), dtype=float)
+    # of dh_table(q).
     for q in SAMPLES[:10]:
         frames = fk.forward_kinematics(q, all_frames=True)
+        table = np.asarray(fk.dh_table(q), dtype=float)
         for i in range(1, 7):
-            a, alpha, d, offset = table[i - 1]
-            A = fk.mdh_transform(a, alpha, d, q[i - 1] + offset)
+            A = fk.mdh_transform(*table[i - 1])
             assert np.allclose(frames[i], frames[i - 1] @ A, atol=1e-12)
 
 

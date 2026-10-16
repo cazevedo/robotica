@@ -173,7 +173,7 @@ ros2 topic echo /ufactory/robot_states --once
 | `joint_echo` | anything | minimal subscriber: subscribe, spin, print |
 | `move_joints_demo` | `lab driver` | self-contained; the driver API, read and command |
 | `jog_demo` | `lab driver` | one joint at a time, via the reusable `Lite6Client` |
-| `fk_check` | `lab sim`, `lab real` | Labwork 1, from `src/lite6_kinematics`: you implement the forward kinematics, it checks them against the model and the robot — see [its README](src/lite6_kinematics/README.md) |
+| `fk_node`, `fk_check` | `lab sim`, `lab real` | Labwork 1, from `src/lite6_kinematics`: you write `fk_node` (joint states in, end-effector pose out); `fk_check` checks it against the model and the robot — see [its README](src/lite6_kinematics/README.md) |
 
 Start your own package in `src/`:
 

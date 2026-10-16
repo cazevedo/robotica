@@ -24,16 +24,6 @@ lab build
 source ~/dev_ws/install/setup.bash
 ```
 
-## Keeping your progress in git
-
-From Windows, in the folder that contains this one:
-
-```powershell
-git init
-git add .
-git commit -m "Lab 0 environment"
-```
-
 ## Modifying xarm_ros2 itself
 
 `xarm_ros2` is pre-built inside the image at `/opt/xarm_ws` — you do not need a

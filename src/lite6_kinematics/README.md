@@ -124,21 +124,3 @@ Same ten poses, slowly, one at a time: it waits for Enter before every motion.
 Ctrl+C quits between motions; **it does not stop a motion in progress — the
 emergency stop does.** Besides tf, it compares with the pose the arm's own
 controller reports (`/ufactory/robot_states`). Result: `~/shared/lw1_fk_real.csv`.
-
-## 4. Submit the results
-
-`shared/` is not tracked by git. On your machine, from the repository root:
-
-```bash
-mkdir -p results && cp shared/lw1_fk_sim.csv shared/lw1_fk_real.csv results/
-```
-
-Commit `results/` with your code. The CSVs are checked against the code you
-submit: rerunning is fine, editing them is not.
-
-## `-p once:=true`
-
-Compares once, at whatever configuration the arm is in, without moving it.
-Your node must be running.
-This is what the instructor runs at the checkpoint, after moving the arm to a
-configuration you have not seen.

@@ -2,11 +2,10 @@
 
 THIS IS THE ONLY FILE YOU EDIT IN LABWORK 1.
 
-Implement these four functions, replacing every ``raise NotImplementedError``:
+Implement these three functions, replacing every ``raise NotImplementedError``:
 
     dh_table()                         the modified DH table, with joint offsets
     mdh_transform(a, alpha, d, theta)  one link transform, ^{i-1}_i T
-    link_transforms(q)                 the six link transforms for a joint vector
     forward_kinematics(q, all_frames)  ^0_6 T, or all seven frames ^0_i T
 
 ``pose_from_transform(T)`` at the bottom is PROVIDED: already implemented, do
@@ -66,20 +65,6 @@ def mdh_transform(a: float, alpha: float, d: float, theta: float) -> np.ndarray:
     raise NotImplementedError('mdh_transform() is not implemented yet')
 
 
-def link_transforms(q) -> list:
-    """The six link transforms for joint vector q.
-
-    Args:
-        q: six joint angles (rad), controller convention, order joint1..joint6.
-
-    Returns:
-        List of six (4, 4) arrays [^0_1 T, ^1_2 T, ^2_3 T, ^3_4 T, ^4_5 T, ^5_6 T],
-        built with dh_table() and mdh_transform(), joint offsets applied.
-    """
-    # TODO (LW1, Part B)
-    raise NotImplementedError('link_transforms() is not implemented yet')
-
-
 def forward_kinematics(q, all_frames: bool = False):
     """Pose of the end-effector, ^0_6 T, for joint vector q.
 
@@ -91,8 +76,11 @@ def forward_kinematics(q, all_frames: bool = False):
         all_frames=False: (4, 4) array ^0_6 T.
         all_frames=True:  list of seven (4, 4) arrays
                           [^0_0 T (identity), ^0_1 T, ^0_2 T, ..., ^0_6 T].
+
+    Uses dh_table() and mdh_transform(), joint offsets applied.
     """
-    # TODO (LW1, Part B): use link_transforms().
+    # TODO (LW1, Part B): for each row of dh_table(), theta_i = q_i + theta_offset_i;
+    # chain the transforms from mdh_transform(), starting from the identity.
     raise NotImplementedError('forward_kinematics() is not implemented yet')
 
 

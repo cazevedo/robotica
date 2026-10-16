@@ -96,12 +96,7 @@ def test_mdh_theta_rotates_about_z():
     assert np.allclose(T[:3, :3], _rz(0.7)) and np.allclose(T[:3, 3], 0.0)
 
 
-# --- link_transforms / forward_kinematics -------------------------------------------
-def test_link_transforms_are_six_rigid_transforms():
-    A = fk.link_transforms(SAMPLES[0])
-    assert len(A) == 6 and all(_is_se3(a) for a in A)
-
-
+# --- forward_kinematics ---------------------------------------------------------------
 def test_forward_kinematics_is_a_rigid_transform():
     for q in SAMPLES:
         assert _is_se3(fk.forward_kinematics(q))
@@ -115,12 +110,16 @@ def test_all_frames_structure():
     assert np.allclose(frames[-1], fk.forward_kinematics(q))
 
 
-def test_frames_are_the_product_of_link_transforms():
+def test_frames_chain_dh_table_and_mdh_transform():
+    # Each frame is the previous one times the link transform of the next row
+    # of dh_table(), with theta_i = q_i + theta_offset_i.
+    table = np.asarray(fk.dh_table(), dtype=float)
     for q in SAMPLES[:10]:
         frames = fk.forward_kinematics(q, all_frames=True)
-        A = fk.link_transforms(q)
         for i in range(1, 7):
-            assert np.allclose(frames[i], frames[i - 1] @ A[i - 1], atol=1e-12)
+            a, alpha, d, offset = table[i - 1]
+            A = fk.mdh_transform(a, alpha, d, q[i - 1] + offset)
+            assert np.allclose(frames[i], frames[i - 1] @ A, atol=1e-12)
 
 
 def test_accepts_list_and_array():

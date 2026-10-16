@@ -9,7 +9,7 @@ Every file of the package. You implement one, and you do not touch the rest.
 
 | File | | Purpose |
 |---|---|---|
-| `lite6_kinematics/forward_kinematics.py` | **to implement** | `dh_table`, `mdh_transform`, `link_transforms`, `forward_kinematics`. The only file you edit. It also holds `pose_from_transform`, which is **provided** — do not edit it |
+| `lite6_kinematics/forward_kinematics.py` | **to implement** | `dh_table`, `mdh_transform`, `forward_kinematics`. The only file you edit. It also holds `pose_from_transform`, which is **provided** — do not edit it |
 | `lite6_kinematics/fk_check.py` | provided | the checker node: moves the arm through the ten poses and compares your result with tf and, on the real arm, with the controller |
 | `lite6_kinematics/checking.py` | provided | the checker's helpers: reference poses as 4×4 matrices, the error metrics e_p and e_o |
 | `lite6_kinematics/__init__.py` | provided | empty; makes the folder a Python package |

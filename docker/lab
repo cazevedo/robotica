@@ -67,6 +67,24 @@ MSG
     fi
 }
 
+# Two stacks at once publish two /clock and two tf trees: RViz flickers and
+# nothing is reliable. Refuse to start a second one on top of the first (or of
+# what a previous one left behind).
+require_no_simulation() {
+    if pgrep -f "gz sim|parameter_bridge|robot_state_publisher|move_group" >/dev/null 2>&1; then
+        cat >&2 <<MSG
+${E}A simulation, or what an earlier one left behind, is still running.${R}
+
+  '$1' would start a second stack. Two stacks publish two clocks and two tf trees
+  and RViz flickers. Nothing was started.
+
+  Stop everything in this container:   lab kill
+  (or Ctrl+C in the terminal that runs it, and wait for it to finish)
+MSG
+        exit 4
+    fi
+}
+
 cmd_gazebo() {
     case "${1:-status}" in
         on|1|enable)
@@ -209,9 +227,56 @@ cmd_moveit() {
 
 cmd_sim() {
     require_gazebo "lab sim"
+    require_no_simulation "lab sim"
     say "Gazebo Harmonic + MoveIt + ros2_control"
     echo
     run ros2 launch xarm_moveit_config lite6_moveit_gazebo.launch.py "$@"
+}
+
+cmd_sim_lite() {
+    require_gazebo "lab sim-lite"
+    require_no_simulation "lab sim-lite"
+    say "Gazebo + ros2_control only: no MoveIt, no RViz (open one with:  lab rviz)"
+    echo
+    run ros2 launch xarm_gazebo lite6_beside_table_gazebo.launch.py \
+        load_controller:=true show_rviz:=false "$@"
+}
+
+# A plain RViz for the running simulation: the robot model and tf, fixed frame
+# link_base. No MoveIt, so it cannot plan or move the arm. It starts from RViz's
+# own default configuration (panels, toolbar, layout) and only changes the fixed
+# frame and adds the TF and RobotModel displays. use_sim_time because Gazebo's
+# tf is stamped with simulation time.
+cmd_rviz() {
+    local cfg="${HOME}/.ros/lab-rviz.rviz"
+    local base; base="$(ros2 pkg prefix rviz_common)/share/rviz_common/default.rviz"
+    [ -f "${base}" ] || die "RViz's default configuration not found at ${base}"
+    mkdir -p "$(dirname "${cfg}")"
+    python3 - "${base}" "${cfg}" <<'PY'
+import sys
+import yaml
+
+cfg = yaml.safe_load(open(sys.argv[1]))
+vm = cfg['Visualization Manager']
+vm['Global Options']['Fixed Frame'] = 'link_base'
+vm['Displays'] += [
+    {'Class': 'rviz_default_plugins/TF', 'Name': 'TF', 'Enabled': True,
+     'Show Names': True, 'Marker Scale': 0.15, 'Value': True},
+    {'Class': 'rviz_default_plugins/RobotModel', 'Name': 'RobotModel', 'Enabled': True,
+     'Description Source': 'Topic', 'Value': True,
+     'Description Topic': {'Value': '/robot_description', 'Depth': 5,
+                           'Durability Policy': 'Transient Local',
+                           'History Policy': 'Keep Last',
+                           'Reliability Policy': 'Reliable'}},
+]
+view = vm['Views']['Current']
+view['Distance'] = 1.3
+view['Focal Point'] = {'X': 0.1, 'Y': 0.0, 'Z': 0.2}
+yaml.safe_dump(cfg, open(sys.argv[2], 'w'), sort_keys=False)
+PY
+    say "RViz: robot model + tf in link_base (simulation time, no MoveIt)"
+    echo
+    run rviz2 -d "${cfg}" --ros-args -p use_sim_time:=true "$@"
 }
 
 cmd_gz() {
@@ -269,6 +334,9 @@ cmd_kill() {
     pkill -f "ros2 launch"   2>/dev/null
     pkill -f  rviz2          2>/dev/null
     pkill -f  move_group     2>/dev/null
+    pkill -f  parameter_bridge 2>/dev/null   # a stale /clock publisher makes sim time jump
+    pkill -f  robot_state_publisher 2>/dev/null   # a stale tf publisher makes RViz flicker
+    pkill -f  static_transform_publisher 2>/dev/null
     pkill -f  ruby           2>/dev/null   # gz is launched through ruby
     sleep 1
     say "done"
@@ -353,6 +421,8 @@ lab - Robotics 02000537, Lab 0 (UFACTORY Lite 6 / ROS 2 Jazzy)
   LAUNCH
     lab moveit [args]     RViz + MoveIt, fake controllers   (no Gazebo load)
     lab sim    [args]     Gazebo + MoveIt + ros2_control    [Gazebo ON]
+    lab sim-lite [args]   Gazebo + ros2_control only          [Gazebo ON]
+    lab rviz              plain RViz (robot model + tf), for sim-lite
     lab gz     [world]    bare Gazebo, default shapes.sdf   [Gazebo ON]
     lab real   <ip>       the physical Lite 6 via MoveIt
     lab driver <ip>       the physical Lite 6, driver only (no MoveIt)
@@ -386,6 +456,8 @@ case "${1:-help}" in
     overlay-xarm)  shift; cmd_overlay_xarm "$@" ;;
     moveit|fake)   shift; cmd_moveit "$@" ;;
     sim|gazebo-sim) shift; cmd_sim "$@" ;;
+    sim-lite)      shift; cmd_sim_lite "$@" ;;
+    rviz)          shift; cmd_rviz "$@" ;;
     gz)            shift; cmd_gz "$@" ;;
     real)          shift; cmd_real "$@" ;;
     driver)        shift; cmd_driver "$@" ;;

@@ -31,6 +31,12 @@ fi
 # --- overlay: your own workspace, built with `lab build` ---------------------
 if [ -f "${HOME}/dev_ws/install/setup.bash" ]; then
     source "${HOME}/dev_ws/install/setup.bash"
+elif [ -n "$(ls -A "${HOME}/dev_ws/src" 2>/dev/null)" ]; then
+    # src/ has packages but nothing is built: `ros2 run` would say "package
+    # not found". Say why, in interactive shells only.
+    case $- in *i*)
+        echo "!! your packages in ~/dev_ws/src are not built yet - run:  lab build" >&2 ;;
+    esac
 fi
 
 # --- ROS_DOMAIN_ID -----------------------------------------------------------

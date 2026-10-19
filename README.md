@@ -45,6 +45,20 @@ Put your assigned `ROS_DOMAIN_ID` in `.env`, then build — once, mostly downloa
 `doctor` checks ROS, the xarm packages, the display, the GL renderer and both
 workspaces. Run it before asking anyone anything.
 
+Last, build the packages in `./src` (`lite6_control` and anything of yours) —
+inside the container, once:
+
+```bash
+./lab.sh shell
+```
+
+```bash
+lab build
+```
+
+Then `exit` and open a new `./lab.sh shell`. Until this is done,
+`ros2 run lite6_control ...` answers `Package 'lite6_control' not found`.
+
 Every terminal after that is `./lab.sh shell` (a new Terminal tab, ⌘T), which
 drops you into the same running container. Inside, `lab` is the menu.
 `./lab.sh vnc` opens the RViz/Gazebo desktop in your browser.
@@ -170,10 +184,13 @@ ros2 topic echo /ufactory/robot_states --once
 | `joint_echo` | anything | minimal subscriber: subscribe, spin, print |
 | `move_joints_demo` | `lab driver` | self-contained; the driver API, read and command |
 | `jog_demo` | `lab driver` | one joint at a time, via the reusable `Lite6Client` |
+| `fk_node`, `fk_check` | `lab sim`, `lab real` | Labwork 1, from `src/lite6_kinematics`: you write `fk_node` (joint states in, end-effector pose out); `fk_check` checks it against the model and the robot — see [its README](src/lite6_kinematics/README.md) |
 
-All three use the driver API, so they need `lab driver`. **The node you run in the
-simulation pipeline is one you write yourself**, against the trajectory action
-above.
+The three `lite6_control` nodes use the driver API, so they need `lab driver`.
+**The node you run in the simulation pipeline is one you write yourself**, against
+the trajectory action above. The `lite6_kinematics` nodes are the exception: `fk_node`
+reads `/joint_states` and `fk_check` uses that action, so both run in Gazebo first and
+then on the arm.
 
 Start your own package in `src/`:
 
@@ -297,6 +314,7 @@ which is what `lab overlay-xarm` is for if you ever need to modify `xarm_ros2`.
 | Build killed / machine freezes | Give Docker more memory (Settings → Resources) or lower `COLCON_JOBS` in `.env`, then `./lab.sh rebuild`. |
 | `no action server on /lite6_traj_controller/...` | You are on `lab driver`, which has no `controller_manager`. Use `lab sim` or `lab real`. |
 | Service calls ignored, arm does not move | Two owners. `ros2 topic echo /ufactory/robot_states --once` — mode 1 means `ros2_control` has it. |
+| `Package 'lite6_control' not found` | Not built yet: `lab build`, then a new `./lab.sh shell`. A shell opened *before* the build does not see it either. |
 | `ros2: command not found` inside | A shell that skipped `~/.bashrc`. Run `bash -l`. |
 | RViz/Gazebo open nothing | `lab doctor`, then `DISPLAY_MODE=vnc` + `./lab.sh restart`. |
 | Gazebo hangs for minutes on first launch | Normal — Fuel models and shaders, cached in a volume, once only. |
@@ -322,6 +340,7 @@ docker/ros_setup.sh     Step 7 of the handout, sourced by every shell
 docker/start-display    VNC (browser) / external X (XQuartz)
 .devcontainer/          VS Code "Reopen in Container"
 src/lite6_control/      worked example ROS 2 Python package
+src/lite6_kinematics/   Labwork 1: forward kinematics (template + checker)
 src/                    YOUR packages     (= ~/dev_ws/src)
 shared/                 files in and out  (= ~/shared)
 ```

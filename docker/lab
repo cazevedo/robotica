@@ -223,55 +223,37 @@ cmd_sim_lite() {
 }
 
 # A plain RViz for the running simulation: the robot model and tf, fixed frame
-# link_base. No MoveIt, so it cannot plan or move the arm. use_sim_time because
-# Gazebo's tf is stamped with simulation time.
+# link_base. No MoveIt, so it cannot plan or move the arm. It starts from RViz's
+# own default configuration (panels, toolbar, layout) and only changes the fixed
+# frame and adds the TF and RobotModel displays. use_sim_time because Gazebo's
+# tf is stamped with simulation time.
 cmd_rviz() {
     local cfg="${HOME}/.ros/lab-rviz.rviz"
+    local base; base="$(ros2 pkg prefix rviz_common)/share/rviz_common/default.rviz"
+    [ -f "${base}" ] || die "RViz's default configuration not found at ${base}"
     mkdir -p "$(dirname "${cfg}")"
-    cat > "${cfg}" <<'RVIZ'
-Visualization Manager:
-  Class: ""
-  Displays:
-    - Class: rviz_default_plugins/Grid
-      Name: Grid
-      Enabled: true
-    - Class: rviz_default_plugins/TF
-      Name: TF
-      Enabled: true
-      Show Names: true
-      Marker Scale: 0.15
-    - Class: rviz_default_plugins/RobotModel
-      Name: RobotModel
-      Enabled: true
-      Description Source: Topic
-      Description Topic:
-        Value: /robot_description
-        Depth: 5
-        Durability Policy: Transient Local
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-  Global Options:
-    Fixed Frame: link_base
-    Frame Rate: 30
-  Enabled: true
-  Tools:
-    - Class: rviz_default_plugins/MoveCamera
-  Value: true
-  Views:
-    Current:
-      Class: rviz_default_plugins/Orbit
-      Distance: 1.3
-      Focal Point:
-        X: 0.1
-        Y: 0
-        Z: 0.2
-      Pitch: 0.5
-      Yaw: 0.8
-      Value: Orbit (rviz)
-Window Geometry:
-  Height: 800
-  Width: 1100
-RVIZ
+    python3 - "${base}" "${cfg}" <<'PY'
+import sys
+import yaml
+
+cfg = yaml.safe_load(open(sys.argv[1]))
+vm = cfg['Visualization Manager']
+vm['Global Options']['Fixed Frame'] = 'link_base'
+vm['Displays'] += [
+    {'Class': 'rviz_default_plugins/TF', 'Name': 'TF', 'Enabled': True,
+     'Show Names': True, 'Marker Scale': 0.15, 'Value': True},
+    {'Class': 'rviz_default_plugins/RobotModel', 'Name': 'RobotModel', 'Enabled': True,
+     'Description Source': 'Topic', 'Value': True,
+     'Description Topic': {'Value': '/robot_description', 'Depth': 5,
+                           'Durability Policy': 'Transient Local',
+                           'History Policy': 'Keep Last',
+                           'Reliability Policy': 'Reliable'}},
+]
+view = vm['Views']['Current']
+view['Distance'] = 1.3
+view['Focal Point'] = {'X': 0.1, 'Y': 0.0, 'Z': 0.2}
+yaml.safe_dump(cfg, open(sys.argv[2], 'w'), sort_keys=False)
+PY
     say "RViz: robot model + tf in link_base (simulation time, no MoveIt)"
     echo
     run rviz2 -d "${cfg}" --ros-args -p use_sim_time:=true "$@"

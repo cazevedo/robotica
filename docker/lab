@@ -214,6 +214,69 @@ cmd_sim() {
     run ros2 launch xarm_moveit_config lite6_moveit_gazebo.launch.py "$@"
 }
 
+cmd_sim_lite() {
+    require_gazebo "lab sim-lite"
+    say "Gazebo + ros2_control only: no MoveIt, no RViz (open one with:  lab rviz)"
+    echo
+    run ros2 launch xarm_gazebo lite6_beside_table_gazebo.launch.py \
+        load_controller:=true show_rviz:=false "$@"
+}
+
+# A plain RViz for the running simulation: the robot model and tf, fixed frame
+# link_base. No MoveIt, so it cannot plan or move the arm. use_sim_time because
+# Gazebo's tf is stamped with simulation time.
+cmd_rviz() {
+    local cfg="${HOME}/.ros/lab-rviz.rviz"
+    mkdir -p "$(dirname "${cfg}")"
+    cat > "${cfg}" <<'RVIZ'
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Names: true
+      Marker Scale: 0.15
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+  Global Options:
+    Fixed Frame: link_base
+    Frame Rate: 30
+  Enabled: true
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 1.3
+      Focal Point:
+        X: 0.1
+        Y: 0
+        Z: 0.2
+      Pitch: 0.5
+      Yaw: 0.8
+      Value: Orbit (rviz)
+Window Geometry:
+  Height: 800
+  Width: 1100
+RVIZ
+    say "RViz: robot model + tf in link_base (simulation time, no MoveIt)"
+    echo
+    run rviz2 -d "${cfg}" --ros-args -p use_sim_time:=true "$@"
+}
+
 cmd_gz() {
     require_gazebo "lab gz"
     run gz sim "${@:-shapes.sdf}"
@@ -269,6 +332,7 @@ cmd_kill() {
     pkill -f "ros2 launch"   2>/dev/null
     pkill -f  rviz2          2>/dev/null
     pkill -f  move_group     2>/dev/null
+    pkill -f  parameter_bridge 2>/dev/null   # a stale /clock publisher makes sim time jump
     pkill -f  ruby           2>/dev/null   # gz is launched through ruby
     sleep 1
     say "done"
@@ -353,6 +417,8 @@ lab - Robotics 02000537, Lab 0 (UFACTORY Lite 6 / ROS 2 Jazzy)
   LAUNCH
     lab moveit [args]     RViz + MoveIt, fake controllers   (no Gazebo load)
     lab sim    [args]     Gazebo + MoveIt + ros2_control    [Gazebo ON]
+    lab sim-lite [args]   Gazebo + ros2_control only          [Gazebo ON]
+    lab rviz              plain RViz (robot model + tf), for sim-lite
     lab gz     [world]    bare Gazebo, default shapes.sdf   [Gazebo ON]
     lab real   <ip>       the physical Lite 6 via MoveIt
     lab driver <ip>       the physical Lite 6, driver only (no MoveIt)
@@ -386,6 +452,8 @@ case "${1:-help}" in
     overlay-xarm)  shift; cmd_overlay_xarm "$@" ;;
     moveit|fake)   shift; cmd_moveit "$@" ;;
     sim|gazebo-sim) shift; cmd_sim "$@" ;;
+    sim-lite)      shift; cmd_sim_lite "$@" ;;
+    rviz)          shift; cmd_rviz "$@" ;;
     gz)            shift; cmd_gz "$@" ;;
     real)          shift; cmd_real "$@" ;;
     driver)        shift; cmd_driver "$@" ;;

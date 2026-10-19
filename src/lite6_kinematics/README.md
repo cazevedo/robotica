@@ -82,8 +82,11 @@ Then open a new shell (a brand-new package needs re-sourcing).
 **Terminal 1:**
 
 ```bash
-lab sim
+lab sim-lite
 ```
+
+This starts Gazebo and the robot controllers only, without MoveIt. To look at
+the robot while it runs, open another terminal and run `lab rviz`.
 
 **Terminal 2** — your node:
 
@@ -91,7 +94,7 @@ lab sim
 ros2 run lite6_kinematics fk_node
 ```
 
-Watch what it publishes while you move the arm in RViz:
+Look at what it publishes:
 
 ```bash
 ros2 topic echo /lite6_fk/pose

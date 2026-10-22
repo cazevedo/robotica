@@ -185,12 +185,13 @@ ros2 topic echo /ufactory/robot_states --once
 | `move_joints_demo` | `lab driver` | self-contained; the driver API, read and command |
 | `jog_demo` | `lab driver` | one joint at a time, via the reusable `Lite6Client` |
 | `fk_node`, `fk_check` | `lab sim`, `lab real` | Labwork 1, from `src/lite6_kinematics`: you write `fk_node` (joint states in, end-effector pose out); `fk_check` checks it against the model and the robot — see [its README](src/lite6_kinematics/README.md) |
+| `ik_node`, `ik_check`, `ik_study` | `lab sim`, `lab real` (`ik_study`: nothing) | Labwork 2, same package: you write `ik_node` (desired pose in, joint angles out, by Newton's method); `ik_check` checks it against the model and the robot; `ik_study` runs the convergence studies |
 
 The three `lite6_control` nodes use the driver API, so they need `lab driver`.
 **The node you run in the simulation pipeline is one you write yourself**, against
 the trajectory action above. The `lite6_kinematics` nodes are the exception: `fk_node`
-reads `/joint_states` and `fk_check` uses that action, so both run in Gazebo first and
-then on the arm.
+and `ik_node` read `/joint_states`, `fk_check` and `ik_check` use that action, so all
+run in Gazebo first and then on the arm.
 
 Start your own package in `src/`:
 
@@ -340,7 +341,7 @@ docker/ros_setup.sh     Step 7 of the handout, sourced by every shell
 docker/start-display    VNC (browser) / external X (XQuartz)
 .devcontainer/          VS Code "Reopen in Container"
 src/lite6_control/      worked example ROS 2 Python package
-src/lite6_kinematics/   Labwork 1: forward kinematics (template + checker)
+src/lite6_kinematics/   Labworks 1-2: forward and inverse kinematics (templates + checkers)
 src/                    YOUR packages     (= ~/dev_ws/src)
 shared/                 files in and out  (= ~/shared)
 ```

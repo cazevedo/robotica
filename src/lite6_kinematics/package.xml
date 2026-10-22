@@ -4,8 +4,9 @@
   <name>lite6_kinematics</name>
   <version>0.1.0</version>
   <description>
-    Labwork 1: forward kinematics of the UFACTORY Lite 6 (modified DH), and
-    the provided fk_check node. Robotics (02000537), 2026/2027.
+    Labwork 1: forward kinematics of the UFACTORY Lite 6 (modified DH), and the
+    provided fk_check node. Labwork 2: inverse kinematics by Newton's method,
+    and the provided ik_check and ik_study. Robotics (02000537), 2026/2027.
   </description>
   <maintainer email="cazevedo@ipn.pt">cazevedo</maintainer>
   <license>MIT</license>

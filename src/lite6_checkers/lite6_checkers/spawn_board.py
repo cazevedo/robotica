@@ -1,8 +1,9 @@
 """
 Put the checkerboard, and the 24 men on their starting squares, into the running Gazebo world.
 
-    ros2 run lite6_checkers spawn_board [--no-pieces] [--x X] [--y Y] [--z Z] [--yaw RAD]
+    ros2 run lite6_checkers spawn_board [--no-pieces] [--no-camera] [--x X] [--y Y] [--z Z] [--yaw RAD]
 
+Last, it moves the camera of the Gazebo window to look at the robot and the board from close by.
 It waits for the world's `create` service to appear (Gazebo takes a while to start,
 longer the first time, when it downloads the table from Fuel), then asks for the board and the
 pieces. `lab sim` and `lab sim-lite` start it for you; run it by hand to put a board back after
@@ -119,6 +120,45 @@ def try_create(world, request):
     return call(world, 'create', 'gz.msgs.EntityFactory', request)
 
 
+# The camera of the Gazebo window. Gazebo opens it far from everything, on the table seen from
+# 3 m. After the board is in, the spawner moves it to look at the robot and the board together:
+# at the middle of the playing area, a little towards the robot, seen from the side and above.
+CAMERA_TARGET_SHIFT = (0.0, 0.12, 0.19)   # from the board centre: towards the robot, up to half the height of the arm (m)
+CAMERA_OFFSET = (0.62, 0.40, 0.32)        # from that target to the camera, world axes (m)
+
+
+def camera_pose(board):
+    """(x, y, z, qx, qy, qz, qw) of a camera that looks at the board and the robot from nearby."""
+    tx = board[0] + CAMERA_TARGET_SHIFT[0]
+    ty = board[1] + CAMERA_TARGET_SHIFT[1]
+    tz = board[2] + CAMERA_TARGET_SHIFT[2]
+    px, py, pz = tx + CAMERA_OFFSET[0], ty + CAMERA_OFFSET[1], tz + CAMERA_OFFSET[2]
+    dx, dy, dz = tx - px, ty - py, tz - pz
+    yaw = math.atan2(dy, dx)
+    pitch = math.atan2(-dz, math.hypot(dx, dy))          # positive: looking down
+    cy, sy, cp, sp = math.cos(yaw / 2), math.sin(yaw / 2), math.cos(pitch / 2), math.sin(pitch / 2)
+    return px, py, pz, -sy * sp, cy * sp, sy * cp, cy * cp
+
+
+def move_camera(board, timeout):
+    """Point the Gazebo window's camera at the scene. Best effort: no window (headless), no move."""
+    px, py, pz, qx, qy, qz, qw = camera_pose(board)
+    request = (f'pose: {{position: {{x: {px:.4f} y: {py:.4f} z: {pz:.4f}}} '
+               f'orientation: {{x: {qx:.5f} y: {qy:.5f} z: {qz:.5f} w: {qw:.5f}}}}}')
+    cmd = ['gz', 'service', '-s', '/gui/move_to/pose', '--reqtype', 'gz.msgs.GUICamera',
+           '--reptype', 'gz.msgs.Boolean', '--timeout', '3000', '--req', request]
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return False
+        if out.returncode == 0 and 'true' in out.stdout:
+            return True
+        time.sleep(2.0)
+    return False
+
+
 def add_pose_arguments(ap):
     ap.add_argument('--x', type=float, default=DEFAULT_X, help='world x of the board centre, m')
     ap.add_argument('--y', type=float, default=DEFAULT_Y, help='world y of the board centre, m')
@@ -145,6 +185,7 @@ def main():
     add_pose_arguments(ap)
     ap.add_argument('--name', default='checkerboard')
     ap.add_argument('--no-pieces', action='store_true', help='the board alone')
+    ap.add_argument('--no-camera', action='store_true', help='leave the camera of the Gazebo window where it is')
     args = ap.parse_args()
     board = (args.x, args.y, args.z, args.yaw)
 
@@ -157,13 +198,18 @@ def main():
     print(f'spawn_board: "{args.name}" is in the world at '
           f'x={args.x:.3f} y={args.y:.3f} z={args.z:.3f} yaw={args.yaw:.3f}', flush=True)
 
-    if args.no_pieces:
-        return
-    ok, last = retry(deadline, lambda: call(args.world, 'create_multiple', 'gz.msgs.EntityFactory_V',
-                                            pieces_request(board)))
-    if not ok:
-        sys.exit(f'spawn_board: the board is in, but the pieces were not. Last answer: {last or "(none)"}')
-    print(f'spawn_board: {len(start_position())} men on their starting squares', flush=True)
+    if not args.no_pieces:
+        ok, last = retry(deadline, lambda: call(args.world, 'create_multiple', 'gz.msgs.EntityFactory_V',
+                                                pieces_request(board)))
+        if not ok:
+            sys.exit(f'spawn_board: the board is in, but the pieces were not. Last answer: {last or "(none)"}')
+        print(f'spawn_board: {len(start_position())} men on their starting squares', flush=True)
+
+    if not args.no_camera:
+        if move_camera(board, timeout=120.0):
+            print('spawn_board: camera moved to look at the robot and the board', flush=True)
+        else:
+            print('spawn_board: no Gazebo window to move the camera of (headless?), left alone', flush=True)
 
 
 if __name__ == '__main__':

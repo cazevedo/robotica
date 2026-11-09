@@ -9,7 +9,8 @@ thick. The dark squares are the ones the game is played on: a1 is dark, at White
 corner, so the long dark diagonal a1–h8 runs to each player's left (§1.1).
 
 `lab sim` and `lab sim-lite` start the board and the 24 men on their starting squares for you: they
-appear a few seconds after Gazebo opens.
+appear a few seconds after Gazebo opens, and the camera of the Gazebo window moves to look at the robot
+and the board from about 0.8 m away, instead of the 3 m of Gazebo's default view.
 
 ## The pieces
 
@@ -72,7 +73,10 @@ in `src/xarm_gazebo`):
 ros2 run lite6_checkers spawn_board --x -0.2 --y -0.74 --z 1.025 --yaw -1.5708
 ```
 
-(`--no-pieces` for the board alone. Remove the first board and pieces before spawning another set:
+(`--no-pieces` for the board alone, `--no-camera` to leave the camera where Gazebo put it; the
+framing is `CAMERA_TARGET_SHIFT` and `CAMERA_OFFSET` in `spawn_board.py`: the whole arm has to fit
+the *vertical* field of view, which gets narrower as the window gets wider, so it cannot go much
+closer than this. Remove the first board and pieces before spawning another set:
 `gz service -s /world/default/remove --reqtype gz.msgs.Entity --reptype gz.msgs.Boolean --timeout 3000 --req 'name: "checkerboard" type: MODEL'`,
 and the same for each piece, or restart the simulation.)
 

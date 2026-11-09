@@ -19,11 +19,12 @@ import time
 
 from ament_index_python.packages import get_package_share_directory
 
-# World coordinates (m, rad). xarm_gazebo spawns the robot base at (-0.2, -0.5, 1.021) with a
-# yaw of 1.571, on the edge of a table (x -0.75..0.75, y -1.24..-0.44) whose top is at
-# z = 1.015. The robot faces +y, off the table, so the board goes on the table behind it:
-# on the robot's axis, its near edge 0.12 m from the base axis (clear of the base), the
-# 240 mm playing area ending 0.36 m from it. White's side faces the robot.
+# World coordinates (m, rad). The lab's xarm_gazebo (src/xarm_gazebo) spawns the robot base at
+# (-0.2, -0.5, 1.021) with a yaw of -1.571, on the edge of a table (x -0.75..0.75,
+# y -1.24..-0.44) whose top is at z = 1.015. The robot faces -y, onto the table, and the board
+# is in front of it, on its axis: centre 0.24 m from the base axis, so the 240 mm playing area
+# spans 0.12 m to 0.36 m from it, White's side towards the robot. All of it is reachable with
+# the tool vertical (see the README). Change the robot's yaw and this together.
 DEFAULT_X = -0.20
 DEFAULT_Y = -0.74
 DEFAULT_Z = 1.025       # tabletop (1.015) + slab thickness (0.010): the playing surface

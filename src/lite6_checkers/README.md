@@ -20,11 +20,24 @@ running world instead of being written into it (`spawn_board` waits for Gazebo, 
 | Robot base | (−0.2, −0.5, 1.021), yaw 90°: it faces +y, **off the table** |
 | Board | centre (−0.20, −0.74), playing surface at z = 1.025, yaw −90° |
 
-The robot faces away from the table, so a board in front of it would hang in the air. The board is
-therefore on the table **behind the robot, on its axis**: the near edge of the playing area is
-0.12 m from the base axis (clear of the base), the far edge 0.36 m, White's side towards the robot.
+Upstream turns the robot to face +y, off the table. The lab's copy of `xarm_gazebo`
+(`src/xarm_gazebo`, see its `LAB.md`) turns it to face −y instead, onto the table, so the board is
+**in front of the robot, on its axis**, 0.24 m from the base axis to its centre: the playing area
+spans 0.12 m to 0.36 m, White's side towards the robot, the slab clear of the base.
+
+Checked against the Lite 6 kinematics with the gripper fitted (tool 83.6 mm long) and the tool
+vertical: every square, every corner and every edge midpoint of the 240 mm area has an inverse
+kinematic solution inside the joint limits at 5 mm (pushing), 17 mm (grasping) and 50–120 mm
+(flying), for tool yaws of 0°, 30°, 45°, 60° and ±90°, with the nearest joint limit 17° away. In
+Gazebo, the arm driven to a1, h1, a8 and h8 reached each within 0.3 mm of the expected position.
+Closer than about 0.18 m the near squares run into the elbow and wrist limits; beyond 0.30 m the far
+corners approach the 0.43 m reach. A board that fits in the reach always crosses the circle (radius
+about 0.22 m at the push and grasp heights) where the forearm is vertical and joints 4 and 6 line up:
+the arm can be there, but it is a wrist singularity, which matters for FR-09 and PR-09.
+
 That is a default, not the answer to LW1's *board placement*: the reachability survey of T-02 is what
-decides where the real board goes. To try another pose:
+decides where the real board goes. To try another pose of the board (the robot's own pose is the one
+in `src/xarm_gazebo`):
 
 ```bash
 ros2 run lite6_checkers spawn_board --x -0.2 --y -0.74 --z 1.025 --yaw -1.5708

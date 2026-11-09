@@ -225,18 +225,18 @@ cmd_moveit() {
     run ros2 launch xarm_moveit_config lite6_moveit_fake.launch.py "$@"
 }
 
-# Run a simulation launch, and put the checkerboard of the challenge (package
+# Run a simulation launch, and put the checkerboard and its 24 men (package
 # lite6_checkers, 8x8 squares of 30 mm) into the world as soon as Gazebo is up. The
 # upstream launch files hard-code their world, so the board is spawned into the
 # running one rather than written into it. The spawner waits for Gazebo, puts the
-# board in, and exits; it does not outlive the simulation.
+# board and the men in, and exits; it does not outlive the simulation.
 with_board() {
     local pid=""
     if ros2 pkg prefix lite6_checkers >/dev/null 2>&1; then
         ros2 run lite6_checkers spawn_board &
         pid=$!
     else
-        warn "lite6_checkers is not built, so the simulation starts without the checkerboard."
+        warn "lite6_checkers is not built, so the simulation starts without the checkerboard and its pieces."
         warn "Build it once with:  lab build   (then open a new shell)"
     fi
     "$@"
@@ -248,7 +248,7 @@ with_board() {
 cmd_sim() {
     require_gazebo "lab sim"
     require_no_simulation "lab sim"
-    say "Gazebo Harmonic + MoveIt + ros2_control, with the checkerboard"
+    say "Gazebo Harmonic + MoveIt + ros2_control, with the checkerboard and its pieces"
     echo
     with_board run ros2 launch xarm_moveit_config lite6_moveit_gazebo.launch.py "$@"
 }
@@ -256,7 +256,7 @@ cmd_sim() {
 cmd_sim_lite() {
     require_gazebo "lab sim-lite"
     require_no_simulation "lab sim-lite"
-    say "Gazebo + ros2_control only, with the checkerboard: no MoveIt, no RViz (open one with:  lab rviz)"
+    say "Gazebo + ros2_control only, with the checkerboard and its pieces: no MoveIt, no RViz (open one with:  lab rviz)"
     echo
     with_board run ros2 launch xarm_gazebo lite6_beside_table_gazebo.launch.py \
         load_controller:=true show_rviz:=false "$@"

@@ -4,8 +4,8 @@
   <name>lite6_checkers</name>
   <version>0.1.0</version>
   <description>
-    The checkerboard of the Robotics (02000537) challenge, 8 x 8 squares of 30 mm,
-    as a Gazebo model, and the node that puts it in the simulation. 2026/2027.
+    The checkerboard of the Robotics (02000537) challenge, 8 x 8 squares of 30 mm, and its pieces,
+    as Gazebo models, and the node that puts them in the simulation. 2026/2027.
   </description>
   <maintainer email="cazevedo@ipn.pt">cazevedo</maintainer>
   <license>MIT</license>

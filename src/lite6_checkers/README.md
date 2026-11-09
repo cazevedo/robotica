@@ -1,27 +1,56 @@
 # lite6_checkers
 
-The checkerboard of the challenge, as a Gazebo model, and the node that puts it in the simulation.
+The checkerboard of the challenge and its pieces, as Gazebo models, and the node that puts them in
+the simulation.
 
 **8 × 8 squares of 30 mm: a 240 mm × 240 mm playing area** (Challenge, §2). It has a 12 mm
 frame around the playing area, which is cosmetic and not part of the specification, and a slab 10 mm
 thick. The dark squares are the ones the game is played on: a1 is dark, at White's left-hand
 corner, so the long dark diagonal a1–h8 runs to each player's left (§1.1).
 
-`lab sim` and `lab sim-lite` start the board for you: it appears a few seconds after Gazebo opens.
+`lab sim` and `lab sim-lite` start the board and the 24 men on their starting squares for you: they
+appear a few seconds after Gazebo opens.
 
-## Where it is
+## The pieces
 
-The beside-table world of `xarm_ros2` is hard-coded in that package, so the board is spawned into the
-running world instead of being written into it (`spawn_board` waits for Gazebo, spawns, exits).
+Laboratory-supplied, as in the Challenge (§2): a **disc base of Ø 24 mm × 10 mm with a central peg
+of Ø 11 mm × 15 mm**. The peg is the handle: the gripper opens to 16 mm and closes on it, which a
+flat disc would not allow. The base is what a pushed piece is pushed on.
+
+| Model | What it is |
+|---|---|
+| `checker_white`, `checker_black` | a man, ivory or black |
+| `dama_white`, `dama_black` | the *dama* (crowned man): the same piece, with a **gold cap** on the top 4 mm of the peg, which is only a mark: shape, mass and grasp are those of a man (promotion exchanges the man for one of these, §1.1) |
+
+Solid plastic, 1200 kg/m³: **7.1 g**, centre of mass at **8 mm** above the board, so a push has to
+stay below 8 mm: on the base, not on the peg. Friction 0.5 against the board's 0.6. They are free
+bodies, with gravity (the lab's `xarm_gazebo` switches it on, see its `LAB.md`): a pushed piece
+slides and stops where it is left, and one pushed off the board falls.
+
+The starting position is White on ranks 1–3 and Black on ranks 6–8, on the dark squares, 12 each,
+named by their square: `white_a1`, `black_h8`. `spawn_piece` puts one more anywhere, to try a
+promotion or to put one back:
+
+```bash
+ros2 run lite6_checkers spawn_piece dama_white d4
+```
+
+The model origin is the centre of the underside of the base, `z` up along the peg.
+
+## Where the board is
+
+The beside-table world of `xarm_ros2` is hard-coded in that package, so the board and the pieces are
+spawned into the running world instead of being written into it (`spawn_board` waits for Gazebo,
+spawns, exits).
 
 | | World frame |
 |---|---|
 | Table | top at z = 1.015, x ∈ [−0.75, 0.75], y ∈ [−1.24, −0.44] |
-| Robot base | (−0.2, −0.5, 1.021), yaw 90°: it faces +y, **off the table** |
+| Robot base | (−0.2, −0.5, 1.021), yaw −90°: it faces −y, onto the table (upstream: +90°, off it) |
 | Board | centre (−0.20, −0.74), playing surface at z = 1.025, yaw −90° |
 
-Upstream turns the robot to face +y, off the table. The lab's copy of `xarm_gazebo`
-(`src/xarm_gazebo`, see its `LAB.md`) turns it to face −y instead, onto the table, so the board is
+The lab's copy of `xarm_gazebo`
+(`src/xarm_gazebo`, see its `LAB.md`) turns the robot to face −y, onto the table, so the board is
 **in front of the robot, on its axis**, 0.24 m from the base axis to its centre: the playing area
 spans 0.12 m to 0.36 m, White's side towards the robot, the slab clear of the base.
 
@@ -43,8 +72,9 @@ in `src/xarm_gazebo`):
 ros2 run lite6_checkers spawn_board --x -0.2 --y -0.74 --z 1.025 --yaw -1.5708
 ```
 
-(Remove the first board before spawning another:
-`gz service -s /world/default/remove --reqtype gz.msgs.Entity --reptype gz.msgs.Boolean --timeout 3000 --req 'name: "checkerboard" type: MODEL'`.)
+(`--no-pieces` for the board alone. Remove the first board and pieces before spawning another set:
+`gz service -s /world/default/remove --reqtype gz.msgs.Entity --reptype gz.msgs.Boolean --timeout 3000 --req 'name: "checkerboard" type: MODEL'`,
+and the same for each piece, or restart the simulation.)
 
 ## The board frame
 
@@ -58,14 +88,16 @@ step. The dark squares are drawn 0.5 mm proud of the light plate, for the render
 
 ## Changing the model
 
-`models/checkerboard/model.sdf` is generated. Change `lite6_checkers/make_board_sdf.py` and regenerate:
+The `model.sdf` files are generated. Change `lite6_checkers/make_board_sdf.py` or
+`lite6_checkers/make_piece_sdf.py` and regenerate:
 
 ```bash
 cd ~/dev_ws/src/lite6_checkers
 python3 -m lite6_checkers.make_board_sdf > models/checkerboard/model.sdf
+python3 -m lite6_checkers.make_piece_sdf models/
 ```
 
-then `lab build`. The test `test/test_board_sdf.py` fails if the two disagree.
+then `lab build`. The tests in `test/` fail if a file and its generator disagree.
 
 ## Using it without `lab`
 

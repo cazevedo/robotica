@@ -11,6 +11,10 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/models/checkerboard',
          ['models/checkerboard/model.sdf', 'models/checkerboard/model.config']),
+    ] + [
+        ('share/' + package_name + '/models/' + piece,
+         ['models/' + piece + '/model.sdf', 'models/' + piece + '/model.config'])
+        for piece in ('checker_white', 'checker_black', 'dama_white', 'dama_black')
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -21,6 +25,8 @@ setup(
     entry_points={
         'console_scripts': [
             'spawn_board = lite6_checkers.spawn_board:main',
+            'spawn_piece = lite6_checkers.spawn_piece:main',
+            'make_piece_sdf = lite6_checkers.make_piece_sdf:main',
             'make_board_sdf = lite6_checkers.make_board_sdf:main',
         ],
     },

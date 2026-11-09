@@ -75,3 +75,21 @@ def test_parse_square_rejects_nonsense():
     with pytest.raises(ValueError):
         sb.parse_square('i9')
     assert sb.parse_square('D4') == (3, 3)
+
+
+def test_the_camera_looks_at_the_scene_from_nearby():
+    import math
+    board = (sb.DEFAULT_X, sb.DEFAULT_Y, sb.DEFAULT_Z, sb.DEFAULT_YAW)
+    px, py, pz, qx, qy, qz, qw = sb.camera_pose(board)
+    assert math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw) == pytest.approx(1.0)
+    # the camera looks along its own +x: rotate (1, 0, 0) by the quaternion
+    fx = 1 - 2 * (qy * qy + qz * qz)
+    fy = 2 * (qx * qy + qw * qz)
+    fz = 2 * (qx * qz - qw * qy)
+    tx = board[0] + sb.CAMERA_TARGET_SHIFT[0]
+    ty = board[1] + sb.CAMERA_TARGET_SHIFT[1]
+    tz = board[2] + sb.CAMERA_TARGET_SHIFT[2]
+    d = math.dist((px, py, pz), (tx, ty, tz))
+    assert (px + fx * d, py + fy * d, pz + fz * d) == pytest.approx((tx, ty, tz), abs=1e-6)
+    assert 0.5 < d < 1.2                    # close, not the 3 m of Gazebo's default view
+    assert pz > tz                          # from above

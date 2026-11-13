@@ -190,7 +190,7 @@ ros2 topic echo /ufactory/robot_states --once
 
 The three `lite6_control` nodes use the driver API, so they need `lab driver`.
 **The node you run in the simulation pipeline is one you write yourself**, against
-the trajectory action above. The `lite6_kinematics` nodes are the exception: `fk_node`
+the trajectory action above. The `lite6_kinematics` and `lite6_ik` nodes are the exception: `fk_node`
 and `ik_node` read `/joint_states`, `fk_check` and `ik_check` use that action, so all
 run in Gazebo first and then on the arm.
 

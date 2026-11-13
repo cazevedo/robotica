@@ -36,7 +36,7 @@ from your own Labwork 1 (already imported in the template), and `rclpy`, `sensor
 
 Labwork 2 only **adds** a new folder, `src/lite6_ik`. In the repository root:
 
-```powershell
+```bash
 git pull
 ```
 

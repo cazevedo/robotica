@@ -1,0 +1,14 @@
+# Labwork 3 - the circles. PROVIDED, DO NOT EDIT.
+# The pose of link_eef (frame {6}) in link_base (frame {0}) follows a horizontal circle
+# with the tool pointing down (roll pi, pitch 0, yaw 0). Centre in metres, in link_base;
+# radius in metres. The end-effector starts at the point centre + (radius, 0, 0).
+circles:
+  C1:
+    center: [0.25, 0.00, 0.20]
+    radius: 0.05
+  C2:
+    center: [0.20, 0.12, 0.25]
+    radius: 0.05
+  C3:
+    center: [0.07, 0.00, 0.25]
+    radius: 0.05

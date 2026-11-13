@@ -186,6 +186,7 @@ ros2 topic echo /ufactory/robot_states --once
 | `jog_demo` | `lab driver` | one joint at a time, via the reusable `Lite6Client` |
 | `fk_node`, `fk_check` | `lab sim`, `lab real` | Labwork 1, from `src/lite6_kinematics`: you write `fk_node` (joint states in, end-effector pose out); `fk_check` checks it against the model and the robot — see [its README](src/lite6_kinematics/README.md) |
 | `ik_node`, `ik_check`, `ik_study` | `lab sim`, `lab real` (`ik_study`: nothing) | Labwork 2, from `src/lite6_ik` (a new package beside `lite6_kinematics`): you write `ik_node` (desired pose in, selected joint angles out, by the algebraic solution); `ik_check` checks it against the model and the robot; `ik_study` runs the studies — see [its README](src/lite6_ik/README.md) |
+| `vel_node` | `lab sim-lite`, `lab real` | Labwork 3, from `src/lite6_velocity` (a new package): you write `vel_node` (moves the end-effector along a circle by velocity control, open or closed loop); there is no checker: you write your own measurement tools — see [its README](src/lite6_velocity/README.md) |
 | *(the Newton version of Labwork 2 in `src/lite6_kinematics`)* | | superseded by `src/lite6_ik`; left in place so that nothing you already edited is touched. It is not what Labwork 2 asks for now |
 
 The three `lite6_control` nodes use the driver API, so they need `lab driver`.
@@ -373,6 +374,7 @@ docker/start-display    WSLg / VNC / external X
 src/lite6_control/      worked example ROS 2 Python package
 src/lite6_kinematics/   Labwork 1: forward kinematics (template + checker)
 src/lite6_ik/           Labwork 2: algebraic inverse kinematics (template + checkers)
+src/lite6_velocity/     Labwork 3: velocity control along a circle (template)
 src/                    YOUR packages     (= ~/dev_ws/src)
 shared/                 files in and out  (= ~/shared)
 ```

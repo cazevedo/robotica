@@ -235,7 +235,7 @@ class VelocityNode(Node):
            trajectory of one point reached in start_time, and publishes the
            status 'moving_to_start'. With no executable solution it publishes
            'unreachable' and does nothing more.
-        2. Once start_time has elapsed and every joint is within 1e-3 rad of
+        2. Once start_time has elapsed and every joint is within 1e-2 rad of
            that solution, it publishes 'running'; t = 0 is that instant.
         3. Every dt seconds, with q the latest angles received on
            /joint_states: it publishes T_d(t) on /lite6_vel/reference;
